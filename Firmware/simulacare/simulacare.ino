@@ -56,16 +56,31 @@ portMUX_TYPE timerMux = portMUX_INITIALIZER_UNLOCKED;
 
 volatile uint32_t isrCounter = 0;
 volatile uint32_t lastIsrAt = 0;
+volatile uint32_t tmr_180ms = 0;
 
 void IRAM_ATTR onTimer(){
   // Increment the counter and set the time of ISR
   portENTER_CRITICAL_ISR(&timerMux);
   isrCounter++;
-  lastIsrAt = millis();
+  tmr_180ms++;
+  lastIsrAt = micros();
   portEXIT_CRITICAL_ISR(&timerMux);
   // Give a semaphore that we can check in the loop
   xSemaphoreGiveFromISR(timerSemaphore, NULL);
   // It is safe to use digitalRead/Write here if you want to toggle an output
+  if (tmr_180ms <= 7) {
+     digitalWrite(ledAZ1, HIGH);
+     if(buzzerState){
+        digitalWrite(BUZZER, HIGH);             // activate beep
+    }
+  }
+  if ((tmr_180ms == 7) && (tmr_180ms <= 20)) {
+    digitalWrite(ledAZ1, LOW);
+    digitalWrite(BUZZER, LOW);
+  }
+  else if (tmr_180ms == 20) {
+     tmr_180ms = 0;
+  }   
 }
 
 /* Just a little test message.  Go to http://192.168.4.1 in a web browser
@@ -105,9 +120,13 @@ void setup() {
   // Attach onTimer function to our timer.
   timerAttachInterrupt(timer, &onTimer, true);
 
-  // Set alarm to call onTimer function every second (value in microseconds).
+  // Set alarm to call onTimer function every second (value in microseconds)
   // Repeat the alarm (third parameter)
-  timerAlarmWrite(timer, 1000000, true);
+  //timerAlarmWrite(timer, 1000000, true);
+  
+  // Set Timer Interrupt every 30ms.
+  timerAlarmWrite(timer, 30000, true);
+  
 
   // Start an alarm
   timerAlarmEnable(timer);
@@ -129,7 +148,7 @@ void setup() {
 }
 
 void loop() {
-  pisca_led();
+//  pisca_led();
   le_POT1();
   le_POT2();
   le_VBAT();
@@ -140,7 +159,7 @@ void loop() {
 
 void le_haste()
 {
-  get_distance();
+  //get_distance();
 }
 
 void pisca_led()
@@ -451,10 +470,10 @@ void Wifi_Listen() {
 void beep(uint16_t time)
 {
     if(buzzerState){
-        digitalWrite(BUZZER, LOW); // activate beep
+        digitalWrite(BUZZER, HIGH); // activate beep
     }
     delay(time/2);
-    digitalWrite(BUZZER, HIGH);
+    digitalWrite(BUZZER, LOW);
 }
 
 void led_bicolor(uint8_t led, uint8_t cor)
