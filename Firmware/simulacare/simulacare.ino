@@ -2,11 +2,17 @@
 #include <Wire.h>
 #include "SimpleBLE.h"
 #include "EEPROM.h"
-#include "MegunoLink.h",.
+#include "MegunoLink.h",
 #include "Filter.h"
-#include "VL6180X.h"
 //#include "sensor_Encoder.h"
+#include "ToF.h"
+#include "Web_Config.h"
 #include "hardware.h"
+
+#define DEBUG 1
+#define TIMER_180MS 9
+#define TIMER_420MS 30
+#define TIMER_1S    50
 
 // Create a new exponential filter with a weight of 10 and an initial value of 0. 
 ExponentialFilter<long> FilterPot1(10, 0);
@@ -47,8 +53,8 @@ int keyIndex = 0;
 int wifi_status = WL_IDLE_STATUS;
 uint8_t state = 0;
 
-unsigned int hasteA = 0;
-unsigned int hasteB = 0;
+unsigned int data_compressao = 0;
+unsigned int data_respiracao = 0;
 
 hw_timer_t * timer = NULL;
 volatile SemaphoreHandle_t timerSemaphore;
@@ -57,37 +63,40 @@ portMUX_TYPE timerMux = portMUX_INITIALIZER_UNLOCKED;
 volatile uint32_t isrCounter = 0;
 volatile uint32_t lastIsrAt = 0;
 volatile uint32_t tmr_180ms = 0;
+volatile uint32_t tmr_1seg = 0;
+volatile int ledState = HIGH;
 
 void IRAM_ATTR onTimer(){
   // Increment the counter and set the time of ISR
   portENTER_CRITICAL_ISR(&timerMux);
   isrCounter++;
   tmr_180ms++;
+  tmr_1seg++;
   lastIsrAt = micros();
   portEXIT_CRITICAL_ISR(&timerMux);
   // Give a semaphore that we can check in the loop
   xSemaphoreGiveFromISR(timerSemaphore, NULL);
   // It is safe to use digitalRead/Write here if you want to toggle an output
-  if (tmr_180ms <= 7) {
+  if (tmr_180ms <= TIMER_180MS) {
      digitalWrite(ledAZ1, HIGH);
      if(buzzerState){
-        digitalWrite(BUZZER, HIGH);             // activate beep
+        //digitalWrite(BUZZER, HIGH);             // activate beep
     }
   }
-  if ((tmr_180ms == 7) && (tmr_180ms <= 20)) {
+  if ((tmr_180ms == TIMER_180MS) && (tmr_180ms <= TIMER_420MS)) {
     digitalWrite(ledAZ1, LOW);
     digitalWrite(BUZZER, LOW);
   }
-  else if (tmr_180ms == 20) {
+  else if (tmr_180ms == TIMER_420MS) {
      tmr_180ms = 0;
-  }   
-}
-
-/* Just a little test message.  Go to http://192.168.4.1 in a web browser
- * connected to this access point to see it.
- */
-void handleRoot() {
-  //server.send(200, "text/html", "<h1>You are connected</h1>");
+  }
+  if (tmr_1seg >= TIMER_1S) {
+    // Timer de 1segundo
+    // teste pisca led Bateria
+    tmr_1seg = 0;
+    ledState = !ledState;
+    //digitalWrite(ledVM5, ledState);   
+  }
 }
 
 void onButton(){
@@ -106,6 +115,7 @@ void setup() {
   Serial.printf("Simulacare - Manequim RPC v.1.0.0");
   Serial.println();
   EEPROM.begin(64);
+  load_config();
   chipid=ESP.getEfuseMac();//The chip ID is essentially its MAC address(length: 6 bytes).
   Serial.printf("ESP32 Chip ID = %04X",(uint16_t)(chipid>>32));//print High 2 bytes
   Serial.printf("%08X\n",(uint32_t)chipid);//print Low 4bytes.
@@ -124,10 +134,9 @@ void setup() {
   // Repeat the alarm (third parameter)
   //timerAlarmWrite(timer, 1000000, true);
   
-  // Set Timer Interrupt every 30ms.
-  timerAlarmWrite(timer, 30000, true);
+  // Set Timer Interrupt every 20ms.
+  timerAlarmWrite(timer, 20000, true);
   
-
   // Start an alarm
   timerAlarmEnable(timer);
     
@@ -143,49 +152,20 @@ void setup() {
   btStart();
   Serial.println("Bluetooth BLE Started");
   //teste_leds();
-  Init_VL6180();      // Inicia Sensor ToF
+  //Init_VL6180();      // Inicia Sensor ToF
+  Init_ToF();           // Inicia Sensor ToF
   led_bicolor(LED1, COR_VERDE);
 }
 
-void loop() {
-//  pisca_led();
+void loop() 
+{
   le_POT1();
   le_POT2();
   le_VBAT();
   le_SW3();
-  le_haste();
+  //get_compressao();
+  //get_respiracao();
   Wifi_Listen();
-}
-
-void le_haste()
-{
-  //get_distance();
-}
-
-void pisca_led()
-{
-    if (xSemaphoreTake(timerSemaphore, 0) == pdTRUE){
-    uint32_t isrCount = 0, isrTime = 0;
-    // Read the interrupt count and time
-    portENTER_CRITICAL(&timerMux);
-    isrCount = isrCounter;
-    isrTime = lastIsrAt;
-    portEXIT_CRITICAL(&timerMux);
-    // Print it
-    //Serial.print("onTimer no. ");
-    //Serial.print(isrCount);
-    //Serial.print(" at ");
-    //Serial.print(isrTime);
-    //Serial.println(" ms");
-    if(state == 0) {
-        digitalWrite(ledAZ1, HIGH);
-        state = 255;
-    }
-    else {
-        digitalWrite(ledAZ1, LOW);
-        state = 0;      
-    }
-  }
 }
 
 void le_POT1()
@@ -208,7 +188,7 @@ void le_VBAT()
   FilterVbat.Filter(sensorVbat);
   //Serial.println(FilterVbat.Current());
   // Battery Voltage
-  VBattery = (120.0/20.0) * (float)(FilterVbat.Current()) / 1024.0;       // LiPo battery voltage in volts
+  float VBattery = (FilterVbat.Current() * (3.30 / 4095.0)) * 2.0;                // LiPo battery voltage in volts
 }
 
 void le_SW1()
@@ -273,6 +253,8 @@ void le_SW3()
       // toggle State
       if (buttonSW3State == HIGH) {
         buzzerState = !buzzerState;
+        Serial.print("SW3: ");
+        Serial.println(buzzerState); 
       }
     }
   }
@@ -400,53 +382,58 @@ void Wifi_Listen() {
           client.println("HTTP/1.1 200 OK");
           client.println("Content-Type: text/html");
           client.println("Connection: close");  // the connection will be closed after completion of the response
-          client.println("Refresh: 1");  // refresh the page automatically every 1 sec
+          //client.println("Refresh: 1");  // refresh the page automatically every 1 sec
           client.println();
           client.println("<!DOCTYPE HTML>");
           client.println("<html>");
           // output the value of each analog input pin
-          //for (int analogChannel = 0; analogChannel < 6; analogChannel++) {
-          //  int sensorReading = analogRead(analogChannel);
-            client.print("input POT1");
-            //client.print(analogChannel);
-            client.print(" is ");
-            client.print(FilterPot1.Current());
-            client.println("<br />");       
-          //}
-            client.print("input POT2");
-            //client.print(analogChannel);
-            client.print(" is ");
-            client.print(FilterPot2.Current());
-            client.println("<br />");
-            //
-            client.print("Bateria");
-            client.print(" is ");
-            client.print(FilterVbat.Current());
-            client.println("<br />");
-            //
-            client.print("Tensao Bateria");
-            client.print(" is ");
-            client.print(VBattery);
-            client.println("<br />");
-            //
-            client.print("Buzzer");
-            //client.print(analogChannel);
-            client.print(" is ");
-            client.print(buzzerState);
-            client.println("<br />");
-            //
-            client.print("SW1");
-            client.print(" is ");
-            client.print(SW1State);
-            client.println("<br />");
-            //
-            client.print("SW2");
-            client.print(" is ");
-            client.print(SW2State);
-            client.println("<br />");
-            //                  
-            client.println("</html>");
-           break;
+          client.print("input POT1");
+          client.print(" is ");
+          client.print(FilterPot1.Current());
+          client.println("<br />");       
+          //
+          client.print("input POT2");
+          client.print(" is ");
+          client.print(FilterPot2.Current());
+          client.println("<br />");
+          //
+          client.print("Push-Button");
+          client.print(" is ");
+          client.print(buzzerState);
+          client.println("<br />");
+          //
+          client.print("SW1");
+          client.print(" is ");
+          client.print(SW1State);
+          client.println("<br />");
+          //
+          client.print("SW2");
+          client.print(" is ");
+          client.print(SW2State);
+          client.println("<br />");
+          //
+          client.print("Bateria");
+          client.print(" is ");
+          client.print(FilterVbat.Current());
+          client.println("<br />");
+          //
+          client.print("Tensao Bateria");
+          client.print(" is ");
+          client.print(VBattery);
+          client.println("<br />");
+          //
+          client.print("Respiracao");
+          client.print(" is ");
+          client.print(data_respiracao);
+          client.println("<br />");
+          //
+          client.print("Compressao");
+          client.print(" is ");
+          client.print(data_compressao);
+          client.println("<br />");
+          //
+          client.println("</html>");
+          break;
         }
         if (c == '\n') {
           // you're starting a new line
