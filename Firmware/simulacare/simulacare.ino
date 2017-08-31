@@ -17,9 +17,9 @@
 // Create a new exponential filter with a weight of 10 and an initial value of 0. 
 ExponentialFilter<long> FilterPot1(10, 0);
 ExponentialFilter<long> FilterPot2(10, 0);
-ExponentialFilter<long> FilterVbat(10, 0);
+ExponentialFilter<long> FilterVbat(5, 0);
 
-float VBattery;       // battery voltage from ESP32 ADC read
+float VBattery = 0.00;       // battery voltage from ESP32 ADC read
 
 SimpleBLE ble;
 WiFiServer server(80);
@@ -28,6 +28,10 @@ uint64_t chipid;
 /* Set these to your desired credentials. */
 const char *ssid = "SimulacareRPC";
 const char *password = "12345678";
+
+volatile int ButtonCount = 0;
+int Count = 0;
+unsigned long lastmillis = 0;
 
 // Variaveis Analogicas
 int sensorPot1 = 0;
@@ -80,7 +84,7 @@ void IRAM_ATTR onTimer(){
   if (tmr_180ms <= TIMER_180MS) {
      digitalWrite(ledAZ1, HIGH);
      if(buzzerState){
-        //digitalWrite(BUZZER, HIGH);             // activate beep
+        digitalWrite(BUZZER, HIGH);             // activate beep
     }
   }
   if ((tmr_180ms == TIMER_180MS) && (tmr_180ms <= TIMER_420MS)) {
@@ -99,6 +103,13 @@ void IRAM_ATTR onTimer(){
   }
 }
 
+void Button_int(){          /* this code will be executed every time the interrupt */
+  if(digitalRead(SW2) == LOW) {
+    Serial.println("Int. SW1");
+    ButtonCount++;
+  }  
+}
+
 void onButton(){
     String out = "BLE RCP: ";
     out += String(millis() / 1000);
@@ -110,6 +121,7 @@ void setup() {
   Serial.begin(115200);
   Serial.setDebugOutput(true);
   config_hardware();
+  delay(100);
   Wire.begin();
   Serial.println();
   Serial.printf("Simulacare - Manequim RPC v.1.0.0");
@@ -139,6 +151,8 @@ void setup() {
   
   // Start an alarm
   timerAlarmEnable(timer);
+
+  attachInterrupt(digitalPinToInterrupt(SW1), Button_int, FALLING);
     
   Serial.println("Configuring WIFI Server...");
   /* You can remove the password parameter if you want the AP to be open. */
@@ -152,9 +166,9 @@ void setup() {
   btStart();
   Serial.println("Bluetooth BLE Started");
   //teste_leds();
-  //Init_VL6180();      // Inicia Sensor ToF
   Init_ToF();           // Inicia Sensor ToF
   led_bicolor(LED1, COR_VERDE);
+  lastmillis = millis();
 }
 
 void loop() 
@@ -162,9 +176,12 @@ void loop()
   le_POT1();
   le_POT2();
   le_VBAT();
+  le_SW1();
+  le_SW2();
   le_SW3();
-  //get_compressao();
+  get_compressao();
   //get_respiracao();
+  freq_chave();
   Wifi_Listen();
 }
 
@@ -186,9 +203,12 @@ void le_VBAT()
 {
   sensorVbat = analogRead(VBAT);
   FilterVbat.Filter(sensorVbat);
+  //Serial.print("VBat= ");
   //Serial.println(FilterVbat.Current());
   // Battery Voltage
-  float VBattery = (FilterVbat.Current() * (3.30 / 4095.0)) * 2.0;                // LiPo battery voltage in volts
+  float VBattery = (FilterVbat.Current() * (3.30/4095.0));                // LiPo battery voltage in volts
+  //Serial.print("Bateria= ");
+  //Serial.println(VBattery);
 }
 
 void le_SW1()
@@ -207,6 +227,8 @@ void le_SW1()
       // toggle State
       if (buttonSW1State == HIGH) {
         SW1State = !SW1State;
+        Serial.print("SW1: ");
+        Serial.println(SW1State);
       }
     }
   }
@@ -230,6 +252,8 @@ void le_SW2()
       // toggle State
       if (buttonSW2State == HIGH) {
         SW2State = !SW2State;
+        Serial.print("SW2: ");
+        Serial.println(SW2State);
       }
     }
   }
@@ -299,8 +323,8 @@ void config_hardware()
   digitalWrite(ledVM5, LOW);      // Desliga Led VM5
   digitalWrite(ledAZ1, LOW);      // Desliga Led AZ1
   //
-  digitalWrite(CS0, LOW);         // Selecao 0 VL6180X
-  digitalWrite(CS1, LOW);         // Selecao 1 VL6180X
+  digitalWrite(CS0, LOW);         // Selecao 0 VL6180X - Compressao Desabilitado
+  digitalWrite(CS1, LOW);         // Selecao 0 VL6180X - Respiracao Desabilitado
   digitalWrite(BUZZER, LOW);      // Desliga Buzzer
 }
 
@@ -389,7 +413,8 @@ void Wifi_Listen() {
           // output the value of each analog input pin
           client.print("input POT1");
           client.print(" is ");
-          client.print(FilterPot1.Current());
+          //client.print(FilterPot1.Current());
+          client.print(data_compressao);
           client.println("<br />");       
           //
           client.print("input POT2");
@@ -484,6 +509,21 @@ void led_bicolor(uint8_t led, uint8_t cor)
       digitalWrite(ledVM2, LOW);
       digitalWrite(ledVD2, HIGH);
     }
+  }
+}
+
+void freq_chave()
+{
+  if (millis() - lastmillis >= 1000){         /*Uptade every one second, this will be equal to reading frecuency (Hz).*/
+   detachInterrupt(digitalPinToInterrupt(SW1));    //Disable interrupt when calculating
+   Count = ButtonCount * 60;                  /* Convert frecuency to RPM, note: this works for one interruption per full rotation. For two interrups per full rotation use rpmcount * 30.*/
+   //Serial.print("RPM =\t");                   //print the word "RPM" and tab.
+   //Serial.print(Count);                       // print the rpm value.
+   //Serial.print("\t Hz=\t");                  //print the word "Hz".
+   //Serial.println(ButtonCount);               /*print revolutions per second or Hz. And print new line or enter.*/
+   ButtonCount = 0;                           // Restart the RPM counter
+   lastmillis = millis();                     // Uptade lasmillis
+   attachInterrupt(digitalPinToInterrupt(SW1), Button_int, FALLING);
   }
 }
 

@@ -14,24 +14,24 @@ VL6180X respiracao;
 
 void Init_ToF()
 {
-  digitalWrite(CS0, LOW);
+  //digitalWrite(CS0, HIGH);
   compressao.init();
   compressao.configureDefault();
   compressao.setScaling(SCALING);
   compressao.setTimeout(500);
-  digitalWrite(CS0, HIGH);
+  //digitalWrite(CS0, LOW);
   //
-  //digitalWrite(CS1, LOW);
+  //digitalWrite(CS1, HIGH);
   //respiracao.init();
   //respiracao.configureDefault();
   //respiracao.setScaling(SCALING);
   //respiracao.setTimeout(500);
-  //digitalWrite(CS1, HIGH);
+  //digitalWrite(CS1, LOW);
 }
 
 void get_compressao()
 {
-  digitalWrite(CS0, LOW);
+  //digitalWrite(CS0, HIGH);
   //Serial.print(compressao.getScaling());
   //Serial.print("x) ");
   Serial.print("Compressao: ");
@@ -39,16 +39,16 @@ void get_compressao()
   data_compressao = compressao.readRangeSingleMillimeters();
   Serial.print( data_compressao );
   if (compressao.timeoutOccurred()) { Serial.print(" TIMEOUT"); }
-  digitalWrite(CS0, HIGH);
+  //digitalWrite(CS0, LOW);
   
   Serial.println(" mm");
 
-//  delay(300);
+  delay(200);
 }
 
 void get_respiracao()
 {
-  digitalWrite(CS1, LOW);
+  //digitalWrite(CS1, HIGH);
   //Serial.print(respiracao.getScaling());
   //Serial.print("x) ");
   Serial.print("Respiracao: ");
@@ -56,10 +56,10 @@ void get_respiracao()
   data_respiracao = respiracao.readRangeSingleMillimeters();
   Serial.print( data_respiracao );
   if (respiracao.timeoutOccurred()) { Serial.print(" TIMEOUT"); }
-  digitalWrite(CS1, HIGH);
+  //digitalWrite(CS1, LOW);
   
   Serial.println(" mm");
 
-//  delay(300);
+  delay(200);
 }
 
