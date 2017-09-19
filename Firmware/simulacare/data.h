@@ -6,7 +6,9 @@
 #define TAM_BUF 1500
 #define MODE_AP 0x00
 #define MODE_STA 0x01
-#define TIME_POWEROFF 30000       // 30 segundos em modo Power-Safe
+#define TIME_POWEROFF 30000        // 30 segundos em modo Power-Safe
+#define BUG_ADC 1.87               // Fator Correcao A/D Bateria
+#define BUG_ADC_INT 177
 #define BAT_LEVEL_MIN_1 2233      // Level 3.60V
 #define BAT_LEVEL_MIN_2 2109      // Level 3.40V
 
@@ -79,14 +81,17 @@ volatile int hora = 0;
 
 uint16_t data_compressao[TAM_BUF];
 unsigned long time_compressao[TAM_BUF];
-unsigned long lastcompressao;
+unsigned long lastcompressao = 0;
 uint16_t data_respiracao[TAM_BUF];
 unsigned long time_respiracao[TAM_BUF];
-unsigned long lastrespiracao;
+unsigned long lastrespiracao = 0;
 uint8_t flag_compressao = 0;
 uint8_t flag_respiracao = 0;
 uint16_t qtd_compressao = 0;
 uint16_t qtd_respiracao = 0;
+uint8_t flag_teste = 0;
+unsigned long lastteste = 0;
+unsigned long time_teste = 0;
 
 uint16_t min_resp = 0;
 uint16_t max_resp = 10;

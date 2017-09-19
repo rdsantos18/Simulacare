@@ -1,4 +1,7 @@
 #include <WiFi.h>
+#include <WiFiClient.h>
+#include <WebServer.h>
+#include <ESPmDNS.h>
 #include <Wire.h>
 #include <Preferences.h>
 #include <Bounce2.h>
@@ -11,6 +14,8 @@
 #include "data.h"
 #include "Bluetooth.h"
 #include "pitches.h"
+
+WebServer server(80);
 
 #ifdef __cplusplus
 extern "C" {
@@ -27,9 +32,7 @@ Bounce switchSW1 = Bounce();
 Bounce switchSW2 = Bounce(); 
 
 // Create a new exponential filter with a weight of 5 and an initial value of 0. 
-ExponentialFilter<long> FilterVbat(60, 0);
-
-WiFiServer server(80);
+ExponentialFilter<long> FilterVbat(10, 0);
 
 hw_timer_t * timer = NULL;
 volatile SemaphoreHandle_t timerSemaphore;
@@ -101,6 +104,25 @@ void IRAM_ATTR onTimer(){
   }
 }
 
+void handleRoot() {
+  server.send(200, "text/plain", "Bem-Vindo SimulaCare Manequim!");
+}
+
+void handleNotFound(){
+  String message = "File Not Found\n\n";
+  message += "URI: ";
+  message += server.uri();
+  message += "\nMethod: ";
+  message += (server.method() == HTTP_GET)?"GET":"POST";
+  message += "\nArguments: ";
+  message += server.args();
+  message += "\n";
+  for (uint8_t i=0; i<server.args(); i++){
+    message += " " + server.argName(i) + ": " + server.arg(i) + "\n";
+  }
+  server.send(404, "text/plain", message);
+}
+
 void setup() {
   uint16_t x;
   
@@ -123,11 +145,16 @@ void setup() {
   chipid=ESP.getEfuseMac();//The chip ID is essentially its MAC address(length: 6 bytes).
   Serial.printf("ESP32 Chip ID = %04X",(uint16_t)(chipid>>32));//print High 2 bytes
   Serial.printf("%08X\n",(uint32_t)chipid);//print Low 4bytes.
-  temp_farenheit= temprature_sens_read();
+  temp_farenheit = temprature_sens_read();
+  temp_farenheit = temp_farenheit - 33; 
   temp_celsius = ( temp_farenheit - 32 ) / 1.8;
   Serial.print("ESP32 Temperature: ");
   Serial.print(temp_celsius);
   Serial.println("°C");
+  
+  // Init TOF VL6180x
+  init_vl6180();
+  
   // Create semaphore to inform us when the timer has fired
   timerSemaphore = xSemaphoreCreateBinary();
 
@@ -165,8 +192,8 @@ void setup() {
     IPAddress myIP = WiFi.softAPIP();
     Serial.print("WiFi Mode AP, IP address: ");
     Serial.println(myIP);
-    server.begin();                                                                                                                                                                                                           
-    Serial.println("HTTP server started");
+    //server.begin();                                                                                                                                                                                                           
+    //Serial.println("HTTP server started");
   }
   else {  
     Serial.println("Configuring WIFI Server Mode STA...");
@@ -189,10 +216,24 @@ void setup() {
     Serial.print(rssi);
     Serial.println(" dBm");
   }  
+  if (MDNS.begin("esp32")) {
+    Serial.println("MDNS responder started");
+  }
+  server.on("/", handleRoot);
+
+  server.on("/inline", [](){
+    server.send(200, "text/plain", "this works as well");
+  });
+
+  server.onNotFound(handleNotFound);
+
+  server.begin();
+  Serial.println("HTTP server started");
+  //
   Serial.println("Start Bluetooth");
   setup_BLE();
   Serial.println("Bluetooth BLE Started");
-  analogReadResolution(10);
+  analogReadResolution(12);
   /* setup Preferences */
   //preferences.begin("iotsharing", false);
   /* restoring state, if not exist return default SETUP sate */
@@ -204,44 +245,53 @@ void loop()
   ledState = !ledState;
   digitalWrite(ledATV, ledState);
   Pos_Mao();
-  //le_VBAT();
+  le_VBAT();
   le_SW3();
-  if ( StartMassagem ) {
-    get_compressao();
-    get_respiracao();
-  }  
+  //if ( StartMassagem ) {
+  //  get_compressao();
+  //  get_respiracao();
+  //}
+  read_compressao();
+  read_respiracao();  
  // Wifi_Http_Listen();
   powerdown();
+  //teste_ri();
+  server.handleClient();
 }
 
 void le_VBAT()
 {
+  uint16_t adc;
+  
   sensorVbat = analogRead(VBAT);
+  adc = sensorVbat + BUG_ADC_INT;       // BUG ADC Soma 177
+  sensorVbat = adc;
   FilterVbat.Filter(sensorVbat);
-  Serial.print("VBat = ");
+  //Serial.print("VBat = ");
   //Serial.print(FilterVbat.Current());
-  Serial.print(sensorVbat);
-  temp_farenheit= temprature_sens_read();
+  //Serial.print(sensorVbat);
+  temp_farenheit = temprature_sens_read();
+  temp_farenheit =  temp_farenheit - 33;          // BUG ESP32 temperature - 33
   temp_celsius = ( temp_farenheit - 32 ) / 1.8;
-  Serial.print("\t\tESP32 Temperature: ");
-  Serial.print(temp_celsius);
-  Serial.println("°C");
+  //Serial.print("\t\tESP32 Temperature: ");
+  //Serial.print(temp_celsius);
+  //Serial.println("°C");
+  //printf("Sensor onBoard is F: %i    C: %.2f\n", temp_farenheit, temp_celsius);
   // Battery Voltage
   // (3.30 / 4095.0) = 0.0008058608
-  //float VBattery = (float)(FilterVbat.Current() * (float)(3.30/4095.0));                // LiPo battery voltage in volts
+  float VBattery = (float)(FilterVbat.Current() * (float)(3.30/4095.0));                // LiPo battery voltage in volts
   //Serial.print("Bateria = ");
   //Serial.println(VBattery);
+  
   if(FilterVbat.Current() > BAT_LEVEL_MIN_1) {
-    //StateBateria = 0;
+    StateBateria = 0;
   }
   if((FilterVbat.Current() <= BAT_LEVEL_MIN_1) && (FilterVbat.Current() >= BAT_LEVEL_MIN_2)) {
-    //StateBateria = 1;
+    StateBateria = 1;
   }
   if(FilterVbat.Current() <= BAT_LEVEL_MIN_2) {
-    //StateBateria = 2;    
+    StateBateria = 2;    
   }
-
-  delay(500);
 }
 
 void le_SW3()
@@ -354,9 +404,10 @@ void teste_leds()
   Serial.println("Teste de Leds End.");
 }
 
+/*
 void Wifi_Http_Listen() {
    // listen for incoming clients
-  WiFiClient client = server.available();
+  WebServer client = server.available();
   if (client) {
     Serial.println("new client");
     // an http request ends with a blank line
@@ -434,6 +485,7 @@ void Wifi_Http_Listen() {
     Serial.println("client disonnected");
   }
 }
+*/
 
 void beep(uint16_t time)
 {
@@ -522,7 +574,7 @@ void Pos_Mao()
     // Determined by the state SW1 + SW2:
     if ( (value1 == LOW) && (value2 == LOW) && (flagtecla == 0)) {
       flagtecla = 3;
-      StartMassagem = 1;
+      StartMassagem = !StartMassagem;
       lasteventsw1sw2 = millis();
       powersafe = 0;
       Count++;
@@ -616,5 +668,25 @@ void powerdown()
       powersafe = 1;  
     }
   }  
+}
+
+void teste_ri()
+{
+  unsigned long tst;
+  
+  if(flag_teste == 0) {
+    flag_teste = 1;
+    lastteste = millis();
+    time_teste = 0;
+  }
+  else {
+    tst = millis() - lastteste;
+    time_teste = tst;
+  }
+  Serial.print("Teste Time: ");
+  Serial.print(time_teste);
+  Serial.println("\t");
+  //Serial.println(millis());
+  delay(200);
 }
 
