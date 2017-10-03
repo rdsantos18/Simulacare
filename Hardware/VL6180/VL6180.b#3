@@ -149,7 +149,7 @@
 <wire x1="23.292" y1="78.476" x2="0" y2="78.476" width="0" layer="20"/>
 <text x="15.9512" y="76.962" size="1.27" layer="21">Sensor</text>
 <text x="1.143" y="76.8096" size="1.27" layer="21">SimulaCare</text>
-<text x="10.6172" y="76.2254" size="1.016" layer="21">V1.0.0</text>
+<text x="11.2014" y="75.8444" size="1.016" layer="21">V1.0.0</text>
 <text x="19.8628" y="53.1876" size="1.016" layer="21" rot="R180">SW1</text>
 <text x="17.018" y="54.7116" size="1.016" layer="21">SW2</text>
 <text x="17.0688" y="57.2516" size="1.016" layer="21">GND</text>
@@ -2374,11 +2374,11 @@ design rules under a new name.</description>
 <element name="TP3" library="SparkFun-Connectors" package="PAD.03X.04" value="CS0" x="12.573" y="66.04"/>
 <element name="TP4" library="SparkFun-Connectors" package="PAD.03X.04" value="CS1" x="19.5834" y="64.389"/>
 <element name="U1" library="microbuilder" package="VL6180" value="VL6180X" x="4.572" y="71.882" smashed="yes" rot="R180">
-<attribute name="NAME" x="8.0196" y="72.392" size="1.016" layer="25" ratio="18" rot="R180"/>
+<attribute name="NAME" x="3.5746" y="76.2274" size="1.016" layer="25" ratio="18" rot="R180"/>
 <attribute name="VALUE" x="5.251" y="74.948" size="0.4064" layer="25" ratio="10" rot="R180"/>
 </element>
 <element name="U2" library="microbuilder" package="VL6180" value="VL6180X" x="19.685" y="71.882" smashed="yes" rot="R180">
-<attribute name="NAME" x="19.5258" y="76.4306" size="1.016" layer="25" ratio="18" rot="R180"/>
+<attribute name="NAME" x="20.618" y="76.202" size="1.016" layer="25" ratio="18" rot="R180"/>
 <attribute name="VALUE" x="21.126" y="74.948" size="0.4064" layer="25" ratio="10" rot="R180"/>
 </element>
 <element name="U3" library="microbuilder" package="SOT23-5" value="MIC5219_2.8V" x="3.048" y="57.658" smashed="yes" rot="R90">
@@ -2554,19 +2554,27 @@ design rules under a new name.</description>
 <via x="4.1148" y="62.9412" extent="1-16" drill="0.35"/>
 <via x="4.3688" y="59.944" extent="1-16" drill="0.35"/>
 <via x="4.3434" y="55.3466" extent="1-16" drill="0.35"/>
-<polygon width="0.2032" layer="1">
-<vertex x="0" y="78.4098"/>
-<vertex x="23.3172" y="78.4098"/>
-<vertex x="23.3172" y="50.7746"/>
-<vertex x="0" y="50.7746"/>
-</polygon>
-<polygon width="0.2032" layer="16">
-<vertex x="0.4318" y="78.1558"/>
-<vertex x="22.987" y="78.1558"/>
-<vertex x="22.987" y="51.2064"/>
-<vertex x="0.4318" y="51.2064"/>
-</polygon>
+<wire x1="18.796" y1="68.2752" x2="18.485" y2="70.007" width="0" layer="19" extent="1-1"/>
 <wire x1="18.485" y1="72.257" x2="18.485" y2="70.007" width="0" layer="19" extent="1-1"/>
+<wire x1="13.6144" y1="73.24" x2="16.1426" y2="73.2536" width="0" layer="19" extent="1-1"/>
+<wire x1="10.0076" y1="69.342" x2="13.6144" y2="73.24" width="0" layer="19" extent="1-1"/>
+<wire x1="4.4704" y1="70.104" x2="10.0076" y2="69.342" width="0" layer="19" extent="1-1"/>
+<wire x1="2.4638" y1="68.834" x2="3.3766" y2="70.0024" width="0" layer="19" extent="1-1"/>
+<wire x1="3.39" y1="67.183" x2="2.4638" y2="68.834" width="0" layer="19" extent="1-1"/>
+<wire x1="1.4732" y1="73.4178" x2="3.372" y2="72.257" width="0" layer="19" extent="1-1"/>
+<wire x1="3.39" y1="64.262" x2="3.39" y2="67.183" width="0" layer="19" extent="1-1"/>
+<wire x1="4.1148" y1="62.9412" x2="3.39" y2="64.262" width="0" layer="19" extent="1-1"/>
+<wire x1="3.39" y1="61.341" x2="4.1148" y2="62.9412" width="0" layer="19" extent="1-1"/>
+<wire x1="4.3688" y1="59.944" x2="3.39" y2="61.341" width="0" layer="19" extent="1-1"/>
+<wire x1="4.3481" y1="57.658" x2="4.3688" y2="59.944" width="0" layer="19" extent="1-1"/>
+<wire x1="4.3434" y1="55.3466" x2="4.3481" y2="57.658" width="0" layer="19" extent="1-1"/>
+<wire x1="2.54" y1="54.19" x2="4.3434" y2="55.3466" width="0" layer="19" extent="1-1"/>
+<wire x1="4.699" y1="75.819" x2="3.9938" y2="72.257" width="0" layer="19" extent="1-1"/>
+<wire x1="15.62" y1="59.15" x2="18.796" y2="68.2752" width="0" layer="19" extent="1-1"/>
+<wire x1="15.62" y1="57.15" x2="15.62" y2="59.15" width="0" layer="19" extent="1-1"/>
+<wire x1="18.0848" y1="57.0484" x2="15.62" y2="57.15" width="0" layer="19" extent="1-1"/>
+<wire x1="18.0848" y1="58.2676" x2="18.0848" y2="57.0484" width="0" layer="19" extent="1-1"/>
+<wire x1="21.0566" y1="58.1914" x2="18.0848" y2="58.2676" width="0" layer="19" extent="1-1"/>
 </signal>
 <signal name="3.3V">
 <contactref element="U3" pad="1"/>
