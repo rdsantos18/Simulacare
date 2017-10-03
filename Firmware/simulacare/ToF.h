@@ -30,7 +30,7 @@ VL6180X respiracao;
 
 void init_vl6180()
 {
-  digitalWrite(CS0, LOW);
+  digitalWrite(CS1, LOW);
   delay(50);
 #if MODE == 1  
   Serial.println("VL6180X Single Mode");
@@ -67,7 +67,7 @@ void init_vl6180()
 #endif
 
   // Respiracao
-  digitalWrite(CS1, LOW);
+  digitalWrite(CS0, LOW);
   delay(50);
 #if MODE == 1  
   respiracao.init();
@@ -109,7 +109,7 @@ void get_compressao()
 
   tempo = millis();
   
-  digitalWrite(CS0, LOW);
+  digitalWrite(CS1, LOW);
   delay(1);
 #if MODE == 1  
   compressao.init();
@@ -165,7 +165,7 @@ void get_compressao()
   //Serial.println();
   //
   if (compressao.timeoutOccurred()) { Serial.print(" TIMEOUT"); }
-  digitalWrite(CS0, HIGH);
+  digitalWrite(CS1, HIGH);
   
   qtd_compressao++;
   if(qtd_compressao > 1500) qtd_compressao = 0;
@@ -182,7 +182,7 @@ void get_respiracao()
   tempo = millis();
   
   // Respiracao
-  digitalWrite(CS1, LOW);
+  digitalWrite(CS0, LOW);
   delay(1);
 #if MODE == 1  
   respiracao.init();
@@ -238,7 +238,7 @@ void get_respiracao()
   Serial.println();
   //
   if (respiracao.timeoutOccurred()) { Serial.print(" TIMEOUT"); }
-  digitalWrite(CS1, HIGH);
+  digitalWrite(CS0, HIGH);
   
   qtd_respiracao++;
   if(qtd_respiracao > 1500) qtd_respiracao = 0;
