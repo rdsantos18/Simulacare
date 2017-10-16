@@ -465,7 +465,7 @@ You are welcome to use this library for commercial purposes. For attribution, we
 </libraries>
 <attributes>
 <attribute name="CNAME" value="Simulacare"/>
-<attribute name="CREVISION" value="1.0.0"/>
+<attribute name="CREVISION" value="1.0.1"/>
 <attribute name="DESIGNER" value="Rinaldo"/>
 <attribute name="UNTITLED" value="Chaves Compressão"/>
 </attributes>
