@@ -1,0 +1,7 @@
+//MPD-File
+#ifndef(pack_D3) #declare global_pack_D3=yes; object {IC_SMD_SOT23("","",)translate<0,-0,0> rotate<0,0.000000,0>rotate<0,0.000000,0> rotate<0,0,180> translate<24.130000,-1.500000,10.160000>translate<0,-0.035000,0> }#end		//SOT23 D3  SOT23
+#ifndef(pack_J1) #declare global_pack_J1=yes; object {SPC_SIMPLE_WIRE_JUMPER_05MM()translate<0,0,0> rotate<0,0.000000,0>rotate<0,-180.000000,0> rotate<0,0,0> translate<18.542000,0.000000,23.876000>}#end		//Wire jumper, 5MM J1 J5MM 05
+#ifndef(pack_LED1) #declare global_pack_LED1=yes; object {DIODE_DIS_LED_3MM(Blue,0.300000,0.000000,)translate<0,0,0> rotate<0,0.000000,0>rotate<0,0.000000,0> rotate<0,0,0> translate<8.890000,0.000000,3.810000>}#end		//Diskrete 3MM LED LED1  LED3MM
+#ifndef(pack_R1) #declare global_pack_R1=yes; object {RES_SMD_CHIP_0603("0R0",)translate<0,-0,0> rotate<0,0.000000,0>rotate<0,-90.000000,0> rotate<0,0,180> translate<24.384000,-1.500000,19.050000>translate<0,-0.035000,0> }#end		//SMD Resistor 0603 R1  R0603
+#ifndef(pack_R2) #declare global_pack_R2=yes; object {RES_SMD_CHIP_0603("0R0",)translate<0,-0,0> rotate<0,0.000000,0>rotate<0,-270.000000,0> rotate<0,0,180> translate<17.780000,-1.500000,10.160000>translate<0,-0.035000,0> }#end		//SMD Resistor 0603 R2  R0603
+#ifndef(pack_R3) #declare global_pack_R3=yes; object {RES_SMD_CHIP_0603("0R0",)translate<0,-0,0> rotate<0,0.000000,0>rotate<0,-180.000000,0> rotate<0,0,180> translate<20.320000,-1.500000,19.050000>translate<0,-0.035000,0> }#end		//SMD Resistor 0603 R3  R0603
