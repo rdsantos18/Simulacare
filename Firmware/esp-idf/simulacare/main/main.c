@@ -64,7 +64,7 @@ uint8_t mode_wifi;
 char ssid[32];
 char password[64];
 
-char versao[] = "Simulacare RCP v.1.0.8 14/12/2017";
+char versao[] = "Simulacare RCP v.1.0.9 15/12/2017";
 
 EventGroupHandle_t wifi_event_group;
 const int CONNECTED_BIT = BIT0;
