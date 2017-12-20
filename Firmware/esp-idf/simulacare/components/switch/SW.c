@@ -31,64 +31,61 @@ void posmao_task(void *pvParameters) {
    lastDebounceSW1SW2 = 0;
    flagtecla = 3;
    PosicaoMao = 5;
-//   if(flag_sensor != 0){
 	   while(1) {
-		  pos_mao_sw1 = gpio_get_level(SW1);	// Le Chave SW1
-		  pos_mao_sw2 = gpio_get_level(SW2);	// Le Chave SW2
-		  if ((pos_mao_sw1 != lastState_sw1) || (pos_mao_sw2 != lastState_sw2)) {
-			  lastDebounceSW1SW2 = xTaskGetTickCount() * portTICK_PERIOD_MS;
-		  }
-		  if ((xTaskGetTickCount() - lastDebounceSW1SW2) >= 100) {
-			  // Retorna a ler a chave depois de 100ms
-			  vTaskDelay(100 / portTICK_PERIOD_MS);
+//		  if(flag_sensor != 0){
 			  pos_mao_sw1 = gpio_get_level(SW1);	// Le Chave SW1
 			  pos_mao_sw2 = gpio_get_level(SW2);	// Le Chave SW2
-			  // Determined by the state SW1 + SW2:
-			  if ( (pos_mao_sw1 == 0) && (pos_mao_sw2 == 0) && (flagtecla == 0)) {
-				  flagtecla = 3;
-				  lasteventsw1sw2 = xTaskGetTickCount() * portTICK_PERIOD_MS;
-				  Count++;
-				  PosicaoMao = 4;
-				  printf("SW1+SW2 LOW , PosMao: %d , Contador %d\n", PosicaoMao, Count);
+			  if ((pos_mao_sw1 != lastState_sw1) || (pos_mao_sw2 != lastState_sw2)) {
+				  lastDebounceSW1SW2 = xTaskGetTickCount() * portTICK_PERIOD_MS;
 			  }
-			  else if ((pos_mao_sw1 == 1) && (pos_mao_sw2 == 1) && ((flagtecla == 3) ||
-                       (flagtecla == 1) || (flagtecla == 2))) {
-				  if(flagtecla == 3) {
+			  if ((xTaskGetTickCount() - lastDebounceSW1SW2) >= 100) {
+				  // Retorna a ler a chave depois de 100ms
+				  vTaskDelay(100 / portTICK_PERIOD_MS);
+				  pos_mao_sw1 = gpio_get_level(SW1);	// Le Chave SW1
+				  pos_mao_sw2 = gpio_get_level(SW2);	// Le Chave SW2
+				  // Determined by the state SW1 + SW2:
+				  if ( (pos_mao_sw1 == 0) && (pos_mao_sw2 == 0) && (flagtecla == 0)) {
+					  flagtecla = 3;
 					  lasteventsw1sw2 = xTaskGetTickCount() * portTICK_PERIOD_MS;
-					  PosicaoMao = 5;
-					  printf("SW1+SW2 HIGH\n");
+					  Count++;
+					  PosicaoMao = 4;
+					  printf("SW1+SW2 LOW , PosMao: %d , Contador %d\n", PosicaoMao, Count);
 				  }
-				  if(flagtecla == 1) {
+				  else if ((pos_mao_sw1 == 1) && (pos_mao_sw2 == 1) && ((flagtecla == 3) ||
+                          (flagtecla == 1) || (flagtecla == 2))) {
+					  if(flagtecla == 3) {
+						  lasteventsw1sw2 = xTaskGetTickCount() * portTICK_PERIOD_MS;
+						  PosicaoMao = 5;
+						  printf("SW1+SW2 HIGH\n");
+					  }
+					  if(flagtecla == 1) {
+						  lasteventsw1 = xTaskGetTickCount() * portTICK_PERIOD_MS;
+						  PosicaoMao = 1;
+						  printf("SW1 HIGH\n");
+					  }
+					  if(flagtecla == 2) {
+						  lasteventsw2 = xTaskGetTickCount() * portTICK_PERIOD_MS;
+						  PosicaoMao = 3;
+						  printf("SW2 HIGH\n");
+					  }
+					  flagtecla = 0;
+				  }
+				  else if ((pos_mao_sw1 == 0) && (pos_mao_sw2 == 1) && (flagtecla == 0) ) {
+					  flagtecla = 1;
 					  lasteventsw1 = xTaskGetTickCount() * portTICK_PERIOD_MS;
-					  PosicaoMao = 1;
-					  printf("SW1 HIGH\n");
+					  PosicaoMao = 0;
+					  printf("SW1 LOW\n");
 				  }
-				  if(flagtecla == 2) {
+				  else if ((pos_mao_sw2 == 0) && (pos_mao_sw1 == 1) && (flagtecla == 0)) {
+					  flagtecla = 2;
 					  lasteventsw2 = xTaskGetTickCount() * portTICK_PERIOD_MS;
-					  PosicaoMao = 3;
-					  printf("SW2 HIGH\n");
+					  PosicaoMao = 2;
+					  printf("SW2 LOW\n");
 				  }
-				  flagtecla = 0;
 			  }
-			  else if ((pos_mao_sw1 == 0) && (pos_mao_sw2 == 1) && (flagtecla == 0) ) {
-				  flagtecla = 1;
-				  lasteventsw1 = xTaskGetTickCount() * portTICK_PERIOD_MS;
-				  PosicaoMao = 0;
-				  printf("SW1 LOW\n");
-			  }
-			  else if ((pos_mao_sw2 == 0) && (pos_mao_sw1 == 1) && (flagtecla == 0)) {
-				  flagtecla = 2;
-				  lasteventsw2 = xTaskGetTickCount() * portTICK_PERIOD_MS;
-				  PosicaoMao = 2;
-				  printf("SW2 LOW\n");
-			  }
-		  }
-		  lastState_sw1 = pos_mao_sw1;
-		  lastState_sw2 = pos_mao_sw2;
+			  lastState_sw1 = pos_mao_sw1;
+			  lastState_sw2 = pos_mao_sw2;
+//		  }
 	   } // while(1)
 	   vTaskDelete(NULL);
-//   }
-//   else {
-	   vTaskDelete(NULL);
- //  }
 }

@@ -28,11 +28,6 @@
 #include "hardware.h"
 #include "WebServer.h"
 #include "ota.h"
-#include "gatt-server.h"
-
-#ifdef __cplusplus
-extern "C" {
-#endif
 
 #define TAG "MAIN"
 #define TIMER_OFF ((1000 * 60) * 5)		// 5 Minutos
@@ -368,8 +363,6 @@ void app_main(void)
 
     // Habilita Sensores a Enviar Dados...
     vTaskDelay(50 / portTICK_PERIOD_MS);
-    // Teste Bluetooth BLE GATT Server
-    //app_gatt_server();
     flag_sensor = 255;
 
     while (true) {
