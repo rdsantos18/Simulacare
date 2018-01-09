@@ -15,6 +15,7 @@
 #include <esp_err.h>
 #include "BLECharacteristic.h"
 #include "BLEService.h"
+#include "BLEDevice.h"
 #include "BLEUtils.h"
 #include "BLE2902.h"
 #include "GeneralUtils.h"
@@ -198,17 +199,27 @@ std::string BLECharacteristic::getValue() {
 } // getValue
 
 
+/**
+ * Handle a GATT server event.
+ */
 void BLECharacteristic::handleGATTServerEvent(
 		esp_gatts_cb_event_t      event,
 		esp_gatt_if_t             gatts_if,
 		esp_ble_gatts_cb_param_t* param) {
+	ESP_LOGD(LOG_TAG, ">> handleGATTServerEvent: %s", BLEUtils::gattServerEventTypeToString(event).c_str());
+
 	switch(event) {
 	// Events handled:
-	// ESP_GATTS_ADD_CHAR_EVT
-	// ESP_GATTS_WRITE_EVT
-	// ESP_GATTS_READ_EVT
 	//
+	// ESP_GATTS_ADD_CHAR_EVT
+	// ESP_GATTS_CONF_EVT
+	// ESP_GATTS_CONNECT_EVT
+	// ESP_GATTS_DISCONNECT_EVT
+	// ESP_GATTS_EXEC_WRITE_EVT
+	// ESP_GATTS_READ_EVT
+	// ESP_GATTS_WRITE_EVT
 
+		//
 		// ESP_GATTS_EXEC_WRITE_EVT
 		// When we receive this event it is an indication that a previous write long needs to be committed.
 		//
@@ -216,7 +227,7 @@ void BLECharacteristic::handleGATTServerEvent(
 		// - uint16_t conn_id
 		// - uint32_t trans_id
 		// - esp_bd_addr_t bda
-		// - uint8_t exec_write_flag
+		// - uint8_t exec_write_flag - Either ESP_GATT_PREP_WRITE_EXEC or ESP_GATT_PREP_WRITE_CANCEL
 		//
 		case ESP_GATTS_EXEC_WRITE_EVT: {
 			if (param->exec_write.exec_write_flag == ESP_GATT_PREP_WRITE_EXEC) {
@@ -324,20 +335,18 @@ void BLECharacteristic::handleGATTServerEvent(
 		// - bool          need_rsp
 		//
 		case ESP_GATTS_READ_EVT: {
-			ESP_LOGD(LOG_TAG, "- Testing: 0x%.2x == 0x%.2x", param->read.handle, m_handle);
 			if (param->read.handle == m_handle) {
 
-				if (m_pCallbacks != nullptr) {
-					m_pCallbacks->onRead(this); // Invoke the read callback.
-				}
+
 
 // Here's an interesting thing.  The read request has the option of saying whether we need a response
 // or not.  What would it "mean" to receive a read request and NOT send a response back?  That feels like
 // a very strange read.
 //
 // We have to handle the case where the data we wish to send back to the client is greater than the maximum
-// packet size of 22 bytes.  In this case, we become responsible for chunking the data into uints of 22 bytes.
-// The apparent algorithm is as follows.
+// packet size of 22 bytes.  In this case, we become responsible for chunking the data into units of 22 bytes.
+// The apparent algorithm is as follows:
+//
 // If the is_long flag is set then this is a follow on from an original read and we will already have sent at least 22 bytes.
 // If the is_long flag is not set then we need to check how much data we are going to send.  If we are sending LESS than
 // 22 bytes, then we "just" send it and thats the end of the story.
@@ -351,16 +360,18 @@ void BLECharacteristic::handleGATTServerEvent(
 // The following code has deliberately not been factored to make it fewer statements because this would cloud the
 // the logic flow comprehension.
 //
-				uint16_t maxOffset = m_mtu - 1;
-				if (m_mtu > 512)
+				// TODO requires some more research to confirm that 512 is max PDU like in bluetooth specs
+				uint16_t maxOffset = BLEDevice::getMTU() - 1;
+				if (BLEDevice::getMTU() > 512) {
 					maxOffset = 512;
-				ESP_LOGI(LOG_TAG, "%d", m_mtu);
-				ESP_LOGI(LOG_TAG, "%d", maxOffset);
+				}
 				if (param->read.need_rsp) {
 					ESP_LOGD(LOG_TAG, "Sending a response (esp_ble_gatts_send_response)");
 					esp_gatt_rsp_t rsp;
-					std::string value = m_value.getValue();
+
 					if (param->read.is_long) {
+						std::string value = m_value.getValue();
+
 						if (value.length() - m_value.getReadOffset() < maxOffset) {
 							// This is the last in the chain
 							rsp.attr_value.len    = value.length() - m_value.getReadOffset();
@@ -374,7 +385,14 @@ void BLECharacteristic::handleGATTServerEvent(
 							memcpy(rsp.attr_value.value, value.data() + rsp.attr_value.offset, rsp.attr_value.len);
 							m_value.setReadOffset(rsp.attr_value.offset + maxOffset);
 						}
-					} else {
+					} else { // read.is_long == false
+
+						if (m_pCallbacks != nullptr) {  // If is.long is false then this is the first (or only) request to read data, so invoke the callback
+							m_pCallbacks->onRead(this);   // Invoke the read callback.
+						}
+
+						std::string value = m_value.getValue();
+
 						if (value.length()+1 > maxOffset) {
 							// Too big for a single shot entry.
 							m_value.setReadOffset(maxOffset);
@@ -408,6 +426,7 @@ void BLECharacteristic::handleGATTServerEvent(
 			break;
 		} // ESP_GATTS_READ_EVT
 
+
 		// ESP_GATTS_CONF_EVT
 		//
 		// conf:
@@ -419,18 +438,15 @@ void BLECharacteristic::handleGATTServerEvent(
 			break;
 		}
 
-		case ESP_GATTS_CONNECT_EVT:
-			m_mtu = 23;
+		case ESP_GATTS_CONNECT_EVT: {
 			m_semaphoreConfEvt.give();
 			break;
+		}
 
-		case ESP_GATTS_DISCONNECT_EVT:
+		case ESP_GATTS_DISCONNECT_EVT: {
 			m_semaphoreConfEvt.give();
 			break;
-
-		case ESP_GATTS_MTU_EVT :
-			m_mtu = param->mtu.mtu;
-			break;
+		}
 
 		default: {
 			break;
@@ -442,7 +458,7 @@ void BLECharacteristic::handleGATTServerEvent(
 	// event.
 
 	m_descriptorMap.handleGATTServerEvent(event, gatts_if, param);
-
+	ESP_LOGD(LOG_TAG, "<< handleGATTServerEvent");
 } // handleGATTServerEvent
 
 
@@ -475,14 +491,11 @@ void BLECharacteristic::indicate() {
 		return;
 	}
 
-	if (m_value.getValue().length() > 20) {
-		ESP_LOGD(LOG_TAG, "- Truncating to 20 bytes (maximum notify size)");
+	if (m_value.getValue().length() > (BLEDevice::getMTU() - 3)) {
+		ESP_LOGI(LOG_TAG, "- Truncating to %d bytes (maximum indicate size)", BLEDevice::getMTU() - 3);
 	}
 
 	size_t length = m_value.getValue().length();
-	if (length > 20) {
-		length = 20;
-	}
 
 	m_semaphoreConfEvt.take("indicate");
 
@@ -531,14 +544,11 @@ void BLECharacteristic::notify() {
 		return;
 	}
 
-	if (m_value.getValue().length() > 20) {
-		ESP_LOGD(LOG_TAG, "- Truncating to 20 bytes (maximum notify size)");
+	if (m_value.getValue().length() > (BLEDevice::getMTU() - 3)) {
+		ESP_LOGI(LOG_TAG, "- Truncating to %d bytes (maximum notify size)", BLEDevice::getMTU() - 3);
 	}
 
 	size_t length = m_value.getValue().length();
-	if (length > 20) {
-		length = 20;
-	}
 
 	m_semaphoreConfEvt.take("notify");
 
@@ -701,6 +711,7 @@ void BLECharacteristic::setWriteProperty(bool value) {
 	}
 } // setWriteProperty
 
+
 /**
  * @brief Return a string representation of the characteristic.
  * @return A string representation of the characteristic.
@@ -719,7 +730,9 @@ std::string BLECharacteristic::toString() {
 	return stringstream.str();
 } // toString
 
+
 BLECharacteristicCallbacks::~BLECharacteristicCallbacks() {}
+
 
 /**
  * @brief Callback function to support a read request.

@@ -1,5 +1,10 @@
 /*
  * HttpServer.cpp
+ * Design:
+ * This class represents an HTTP server.  We create an instance of the class and then it is configured.
+ * When the user has completed the configuration, they execute the start() method which starts it running.
+ * A subsequent call to stop() will stop it.  When start() is called, a new task is created which listens
+ * for incoming messages.
  *
  *  Created on: Aug 30, 2017
  *      Author: kolban
@@ -28,6 +33,7 @@ static const char* LOG_TAG = "HttpServer";
 HttpServer::HttpServer() {
 	m_fileBufferSize = 4*1024;    // Default size of the file buffer.
 	m_portNumber = 80;            // The default port number.
+	m_clientTimeout = 5;            // The default timeout 5 seconds.
 	m_rootPath   = "";            // The default path.
 	m_useSSL     = false;         // Default SSL is no.
 	setDirectoryListing(false);   // Default directory listing is disabled.
@@ -103,41 +109,16 @@ private:
 		if (GeneralUtils::endsWith(fileName, '/')) {
 			fileName = fileName.substr(0, fileName.length()-1);
 		}
-
+		
+		HttpResponse response(&request);
 		// Test if the path is a directory.
 		if (FileSystem::isDirectory(fileName)) {
 			ESP_LOGD(LOG_TAG, "Path %s is a directory", fileName.c_str());
-			HttpResponse response(&request);
 			m_pHttpServer->listDirectory(fileName, response);   // List the contents of the directory.
 			return;
 		} // Path was a directory.
 
-		ESP_LOGD("HttpServerTask", "Opening file: %s", fileName.c_str());
-		std::ifstream ifStream;
-		ifStream.open(fileName, std::ifstream::in | std::ifstream::binary);      // Attempt to open the file for reading.
-
-		// If we failed to open the requested file, then it probably didn't exist so return a not found.
-		if (!ifStream.is_open()) {
-			ESP_LOGE("HttpServerTask", "Unable to open file %s for reading", fileName.c_str());
-			HttpResponse response(&request);
-			response.setStatus(HttpResponse::HTTP_STATUS_NOT_FOUND, "Not Found");
-			response.sendData("");
-			return; // Since we failed to open the file, no further work to be done.
-		}
-
-		// We now have an open file and want to push the content of that file through to the browser.
-		// because of defect #252 we have to do some pretty important re-work here.  Specifically, we can't host the whole file in
-		// RAM at one time.  Instead what we have to do is ensure that we only have enough data in RAM to be sent.
-		HttpResponse response(&request);
-		response.setStatus(HttpResponse::HTTP_STATUS_OK, "OK");
-		uint8_t *pData = new uint8_t[m_pHttpServer->getFileBufferSize()];
-		while(!ifStream.eof()) {
-			ifStream.read((char *)pData, m_pHttpServer->getFileBufferSize());
-			response.sendData(pData, ifStream.gcount());
-		}
-		delete[] pData;
-		ifStream.close();
-
+		response.sendFile(fileName, m_pHttpServer->getFileBufferSize());
 	} // processRequest
 
 
@@ -156,19 +137,23 @@ private:
 		while(1) {   // Loop forever.
 
 			ESP_LOGD("HttpServerTask", "Waiting for new peer client");
-			//Memory::checkIntegrity();
+
 			try {
 				clientSocket = m_pHttpServer->m_socket.accept();   // Block waiting for a new external client connection.
+				clientSocket.setTimeout(m_pHttpServer->getClientTimeout());
 			}
 			catch(std::exception &e) {
 				ESP_LOGE("HttpServerTask", "Caught an exception waiting for new client!");
+				m_pHttpServer->m_semaphoreServerStarted.give();  // Release the semaphore .. we are now no longer running.
 				return;
 			}
 
-			ESP_LOGD("HttpServerTask", "HttpServer listening on port %d received a new client connection; sockFd=%d", m_pHttpServer->getPort(), clientSocket.getFD());
-
+			ESP_LOGD("HttpServerTask", "HttpServer that was listening on port %d has received a new client connection; sockFd=%d", m_pHttpServer->getPort(), clientSocket.getFD());
 
 			HttpRequest request(clientSocket);   // Build the HTTP Request from the socket.
+			if (request.isWebsocket()) {        // If this is a WebSocket
+				clientSocket.setTimeout(0);     //   Clear the timeout.
+			}
 			request.dump();                      // debug.
 			processRequest(request);             // Process the request.
 			if (!request.isWebsocket()) {        // If this is NOT a WebSocket, then close it as the request
@@ -330,6 +315,22 @@ void HttpServer::listDirectory(std::string path, HttpResponse& response) {
 } // listDirectory
 
 /**
+ * @brief Set different socket timeout for new connections.
+ * @param [in] use Set to true to enable directory listing.
+ */
+void HttpServer::setClientTimeout(uint32_t timeout) {
+	m_clientTimeout = timeout;
+}
+
+/**
+ * @brief Get current socket's timeout for new connections.
+ * @param [in] use Set to true to enable directory listing.
+ */
+uint32_t HttpServer::getClientTimeout() {
+	return m_clientTimeout;
+}
+
+/**
  * @brief Set whether or not we will list directories.
  * @param [in] use Set to true to enable directory listing.
  */
@@ -389,11 +390,20 @@ void HttpServer::start(uint16_t portNumber, bool useSSL) {
 	// Design:
 	// The start of the HTTP server should be as fast as possible.
 	ESP_LOGD(LOG_TAG, ">> start: port: %d, useSSL: %d", portNumber, useSSL);
+
+	// Take the semaphore that says that we are now running.  If we are already running, then end here as
+	// there is nothing further to do.
+	if (m_semaphoreServerStarted.take(100, "start") == false) {
+		ESP_LOGD(LOG_TAG, "<< start: Already running");
+		return;
+	}
+
 	m_useSSL     = useSSL;
 	m_portNumber = portNumber;
 
 	HttpServerTask* pHttpServerTask = new HttpServerTask("HttpServerTask");
 	pHttpServerTask->start(this);
+	ESP_LOGD(LOG_TAG, "<< start");
 } // start
 
 
@@ -405,7 +415,8 @@ void HttpServer::stop() {
 	// that is listening for incoming connections.  That will then shutdown all the other
 	// activities.
 	ESP_LOGD(LOG_TAG, ">> stop");
-	m_socket.close();
+	m_socket.close();                      // Close the socket that is being used to watch for incoming requests.
+	m_semaphoreServerStarted.wait("stop"); // Wait for the server to stop.
 	ESP_LOGD(LOG_TAG, "<< stop");
 } // stop
 
