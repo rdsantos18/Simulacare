@@ -16,7 +16,20 @@
 #include <esp_log.h>
 #include "driver/gpio.h"
 #include "lwip/sockets.h"
-#include "Buzzer.h"
+#include "kalman.h"
+#include "kalman2.h"
+
+extern "C" {
+	float Le_Bateria(void);
+	uint32_t Le_VoltageCarregador(void);
+	int Le_Carregador(void);
+	uint8_t State_Carregador(void);
+	void Protege_Bateria(void);
+	void bateria_task(void *pvParameters);
+	extern void play_off(void);
+	extern void play_bat_1(void);
+	extern void play_bat_2(void);
+}
 
 #define VBAT		ADC1_CHANNEL_0	// Tensao Bateria
 #define CHARGE		ADC1_CHANNEL_3	// Status Carga Bateria
@@ -25,9 +38,10 @@
 
 #define TAG "BATERIA"
 
+SimpleKalmanFilter FilterBateria(5, 5, 0.1);
+
 uint8_t Carregador;
-uint32_t BateriaVoltage;
-uint32_t BateriaVoltageOld;
+float BateriaVoltage;
 uint32_t CarregadorVoltage;
 uint32_t BateriaLevel;
 
@@ -44,9 +58,10 @@ extern uint8_t flag_sensor;
 esp_adc_cal_characteristics_t vbat;
 esp_adc_cal_characteristics_t charge;
 
-uint32_t Le_Bateria(void)
+float Le_Bateria(void)
 {
-	return (adc1_to_voltage(VBAT, &vbat) * 2);
+	return FilterBateria.updateEstimate(adc1_to_voltage(VBAT, &vbat) * 2);
+//	return (adc1_to_voltage(VBAT, &vbat) * 2);
 }
 
 uint32_t Le_VoltageCarregador(void)
@@ -80,7 +95,7 @@ void Protege_Bateria(void)
 	if ((BateriaLevel >= 10) && (BateriaLevel <= 25)) {
 		// Bateria <= 25% Alarma
 		if(flag_bat1 != 255) {
-			printf("Bateria V:%d P:%d  Alarme 1\n", BateriaVoltage, BateriaLevel);
+			printf("Bateria V:%.0f P:%d  Alarme 1\n", BateriaVoltage, BateriaLevel);
 			play_bat_1();
 			flag_bat1 = 255;
 		}
@@ -88,7 +103,7 @@ void Protege_Bateria(void)
 	if ((BateriaLevel > 5) && (BateriaLevel < 10)) {
 		// Protege Bateria <= 10% Alarme Segundo Estagio
 		if(flag_bat2 != 255) {
-			printf("Bateria V:%d P:%d  Alarme 2\n", BateriaVoltage, BateriaLevel);
+			printf("Bateria V:%.0f P:%d  Alarme 2\n", BateriaVoltage, BateriaLevel);
 			printf("Desliga POWER OFF\n");
 			play_bat_2();
 		}
@@ -117,7 +132,6 @@ void bateria_task(void *pvParameters)
 	//
 	Carregador = 0;
     BateriaVoltage = 0;
-    BateriaVoltageOld = 0;
 	CarregadorVoltage = 0;
 	BateriaLevel = 0;
     SensorCharge = 0;
@@ -135,13 +149,11 @@ void bateria_task(void *pvParameters)
 		Protege_Bateria();
 
 		if(flag_sensor != 0) {
-			printf("B,%d,%d,%d,F\n", Carregador, BateriaVoltage, BateriaLevel);
+			printf("B,%d,%.0f,%d,F\n", Carregador, BateriaVoltage, BateriaLevel);
 			sprintf(msg, "B,%d,%d,F",Carregador, BateriaLevel);
 			send(SocketClient, msg, strlen(msg), 0);
 		}
-
 		vTaskDelay(5000 / portTICK_PERIOD_MS);
 	}
-
 	vTaskDelete(NULL);
 }

@@ -19,7 +19,7 @@
 
 static char tag []="webserver";
 
-extern esp_err_t save_config(void);
+//extern esp_err_t save_config(void);
 
 char clientIPAddressStr[INET6_ADDRSTRLEN];
 
@@ -150,10 +150,10 @@ void mongoose_event_handler(struct mg_connection *nc, int ev, void *evData) {
  				printf("POST Reboot\n");
  				if(strstr(io->buf, "VARRESET=yes") != 0) {
  					printf("Restarting now.\n");
- 					esp_err_t err = save_config();
- 					if(err != ESP_OK) printf("Erro Save_Config\n");
- 					else printf("Save_Config OK!!\n");
- 					esp_restart();
+ 					//esp_err_t err = save_config();
+ 					//if(err != ESP_OK) printf("Erro Save_Config\n");
+ 					//else printf("Save_Config OK!!\n");
+ 					//esp_restart();
  				}
  			}
  			if(strstr(io->buf, "POST / ") != 0) {

@@ -12,7 +12,7 @@
 
 #define TAG "VL6180X"
 
-// 1 Placa Final 0 placa Prototiop
+// 1 Placa Final 0 placa Prototipo
 #define PLACA_FINAL 1
 
 #define	CS0			GPIO_NUM_19		// CS0
@@ -20,6 +20,9 @@
 
 #define SDA_PIN 21
 #define SCL_PIN 22
+//static const gpio_num_t SDA_PIN = GPIO_NUM_21;
+//static const gpio_num_t SCL_PIN = GPIO_NUM_22;
+
 #define ADDRESS_VL6180X 0x29
 
 #define ADDRESS_COMPRESSAO 0x29
@@ -30,32 +33,39 @@
 #define SCALING 1
 
 // Limites para Envio do Comando.
-#define THRESHOLD_C 3
-#define THRESHOLD_V 6
-#define TIMER_BLQ 2000
+#define THRESHOLD_C 8
+#define THRESHOLD_V 8
 
 uint16_t compressao_data[10];
 uint16_t respiracao_data[10];
+uint16_t rasc_c[20];
+uint16_t rasc_r[20];
 uint16_t calibracao[10];
 uint16_t LimiteSuperiorCompressao = 53;
 uint16_t LimiteInferiorCompressao = 9;
 uint16_t LimiteSuperiorRespiracao = 69;
 uint16_t LimiteInferiorRespiracao = 17;
-uint8_t contador_compressao;
-uint8_t contador_respiracao;
 uint16_t value;
 uint16_t respi;
-uint16_t min = 0;
-uint16_t max = 0;
-uint8_t flag_send_init_c = 255;
-uint8_t flag_send_init_r = 255;
+uint16_t minc = 0;
+uint16_t maxc = 0;
+uint16_t minv = 0;
+uint16_t maxv = 0;
+uint16_t erro_c = 0;
+uint16_t erro_v = 0;
 uint32_t lasteventc;
 uint32_t lasteventr;
-uint32_t timer_respiracao;
+uint32_t tmr_c;
+uint32_t tmr_r;
 uint8_t enable_compressao = 0;
 uint8_t enable_respiracao = 0;
 uint8_t status_compressao = 0;
 uint8_t status_respiracao = 0;
+uint8_t haste = 0;
+uint8_t c_ctrl_20ms = 0;
+uint8_t c_ctrl_100ms = 0;
+uint8_t r_ctrl_20ms = 0;
+uint8_t r_ctrl_100ms = 0;
 extern uint8_t PosicaoMao;
 extern int SocketClient;
 extern uint8_t flag_sensor;
@@ -63,6 +73,7 @@ extern uint16_t limite1;
 extern uint16_t limite2;
 extern uint16_t limite3;
 extern uint16_t limite4;
+extern uint8_t flag_teste;
 
 char msg[255];
 int ret;
@@ -135,23 +146,37 @@ void print_status_range(char* msg, uint8_t status)
 	}
 }
 
-uint16_t vl6180x_max_min(uint16_t *data)
+uint16_t vl6180x_max_min_compressao(uint16_t *data)
 {
 	uint8_t x;
-	min = data[0];
-	max = 0;
+	minc = data[0];
+	maxc = 0;
 
 	for(x = 0; x < 5; x++) {
-		if(data[x] > max) max = data[x];
-		else if(data[x] < min) min = data[x];
+		if(data[x] > maxc) maxc = data[x];
+		else if(data[x] < minc) minc = data[x];
 	}
 	return 0;
 }
 
+uint16_t vl6180x_max_min_respiracao(uint16_t *data)
+{
+	uint8_t x;
+	minv = data[0];
+	maxv = 0;
+
+	for(x = 0; x < 5; x++) {
+		if(data[x] > maxv) maxv = data[x];
+		else if(data[x] < minv) minv = data[x];
+	}
+	return 0;
+}
+
+
 void vl6180x_calibracao(uint16_t *data, uint8_t state)
 {
    memcpy(calibracao, data, 10);
-   vl6180x_max_min(&calibracao[0]);
+   //vl6180x_max_min(&calibracao[0]);
    switch(state){
    	   case 0:			// Retorna
    		   break;
@@ -170,10 +195,13 @@ void vl6180x_calibracao(uint16_t *data, uint8_t state)
 
 void vl6180x_task(void *ignore)
 {
-	ESP_LOGD(tag, ">> vl6180x");
+	ESP_LOGI(tag, ">> vl6180x");
 
-	contador_compressao = 0;
-	contador_respiracao = 0;
+	c_ctrl_20ms = 0;
+	c_ctrl_100ms = 0;
+
+	r_ctrl_20ms = 0;
+	r_ctrl_100ms = 0;
 
 	respiracao.i2c_address = 0x29;
 	respiracao.ptp_offset = 0;
@@ -206,6 +234,8 @@ void vl6180x_task(void *ignore)
 	i2c_driver_install(I2C_NUM_0, I2C_MODE_MASTER, 0, 0, 0);
 
 	printf("Inicia Sensores VL6180X\n");
+	erro_v = 0;
+	erro_c = 0;
 
 #if PLACA_FINAL
     printf("2 Sensores VL6180X\n");
@@ -277,67 +307,96 @@ void vl6180x_task(void *ignore)
 	respi = 0;
 	while(1)
 	{
-		if(flag_sensor != 0) {
-			// Compressao
-			if(compressao.id == 0xB4) {
-				value = readRangeSingleMillimeters(&compressao);
-				status_compressao = VL6180X_getrangestatus(&compressao);
-				if (status_compressao == VL6180X_ERROR_NONE) {
-					compressao_data[contador_compressao] = value;
-					contador_compressao++;
-					if(contador_compressao == 5) {
-						contador_compressao = 0;
-						vl6180x_max_min(&compressao_data[0]);
-						if((max - min) >= THRESHOLD_C) {
-							enable_compressao = 255;
-						}
-						else
-							enable_compressao = 0;
-					}
-				}
-			}
-			else enable_compressao = 0;
-			// Respiracao
-			if(respiracao.id == 0xB4) {
-				respi = readRangeSingleMillimeters(&respiracao);
-				status_respiracao = VL6180X_getrangestatus(&respiracao);
-				if(status_respiracao == VL6180X_ERROR_NONE) {
-						respiracao_data[contador_respiracao] = respi;
-						contador_respiracao++;
-					if(contador_respiracao == 5) {
-						vl6180x_max_min(&respiracao_data[0]);
-						contador_respiracao = 0;
-						if((max - min) > THRESHOLD_V) {
-							enable_compressao = 0;
-							enable_respiracao = 255;
-							printf("V,%d,%d,%d,%d,%d,%d,%d,%d,F\n",respiracao_data[0], respiracao_data[1], respiracao_data[2], respiracao_data[3], respiracao_data[4],
-								                                   status_respiracao, max, min);
-							sprintf(msg, "V,%d,%d,%d,%d,%d,F",respiracao_data[0], respiracao_data[1], respiracao_data[2], respiracao_data[3], respiracao_data[4]);
-							send(SocketClient, msg, strlen(msg), 0);
-							lasteventr = xTaskGetTickCount() * portTICK_PERIOD_MS;
-							timer_respiracao = lasteventr;
-						}
-						else {
-							if(enable_respiracao == 255) {
-								uint32_t time_r = xTaskGetTickCount() * portTICK_PERIOD_MS;
-								if((time_r - timer_respiracao) <= TIMER_BLQ) {
-									enable_compressao = 0;
-									enable_respiracao = 0;
-								}
-							}
-						}
-						if(enable_compressao != 0) {
-							printf("C,%d,%d,%d,%d,%d,%d,%d,F\n",compressao_data[0], compressao_data[1], compressao_data[2], compressao_data[3], compressao_data[4], PosicaoMao, status_compressao);
-							sprintf(msg, "C,%d,%d,%d,%d,%d,%d,F",compressao_data[0], compressao_data[1], compressao_data[2], compressao_data[3], compressao_data[4], PosicaoMao);
-							send(SocketClient, msg, strlen(msg), 0);
-							lasteventc = xTaskGetTickCount() * portTICK_PERIOD_MS;
-							enable_compressao = 0;
-						}
-					}
-				}
-			}
-		}
-		vTaskDelay(100 / portTICK_PERIOD_MS);
-	}
+	   if(flag_sensor != 0) {
+#if PLACA_FINAL
+		   // Compressao
+		   if(compressao.id == 0xB4) {
+			   value = readRangeSingleMillimeters(&compressao);
+			   status_compressao = VL6180X_getrangestatus(&compressao);
+			   if (status_compressao == VL6180X_ERROR_NONE) {
+				   rasc_c[c_ctrl_20ms] = value;
+				   c_ctrl_20ms++;
+				   if(c_ctrl_20ms == 10) {
+					   c_ctrl_20ms = 0;
+				       compressao_data[c_ctrl_100ms] = ((rasc_c[0] + rasc_c[1] + rasc_c[2] +
+				    		                             rasc_c[3] + rasc_c[4] + rasc_c[5] +
+														 rasc_c[6] + rasc_c[7] + rasc_c[8] +
+														 rasc_c[9]) / 10);
+					   c_ctrl_100ms++;
+					   if(c_ctrl_100ms == 5) {
+						   c_ctrl_100ms = 0;
+						   c_ctrl_20ms = 0;
+						   enable_compressao = 255;
+						   vl6180x_max_min_compressao(&compressao_data[0]);
+						   if((maxc  - minc) > THRESHOLD_V) {
+							   haste = 0;
+							   lasteventc = xTaskGetTickCount() * portTICK_PERIOD_MS;
+						   }
+					   }
+				   }
+			   }
+			   else {
+				   print_status_range("Compressao-", status_compressao);
+			   }
+		   }
+#endif
+		   // Respiracao
+		   if(respiracao.id == 0xB4) {
+			   respi = readRangeSingleMillimeters(&respiracao);
+			   status_respiracao = VL6180X_getrangestatus(&respiracao);
+			   if(status_respiracao == VL6180X_ERROR_NONE) {
+				   rasc_r[r_ctrl_20ms] = respi;
+				   r_ctrl_20ms++;
+				   if(r_ctrl_20ms == 10) {
+					   r_ctrl_20ms = 0;
+					   respiracao_data[r_ctrl_100ms] = ((rasc_r[0] + rasc_r[1] + rasc_r[2] +
+							                             rasc_r[3] + rasc_r[4] + rasc_r[5] +
+														 rasc_r[6] + rasc_r[7] + rasc_r[8] +
+														 rasc_r[9]) / 10);
+					   r_ctrl_100ms++;
+					   if(r_ctrl_100ms == 5) {
+						   r_ctrl_100ms = 0;
+						   r_ctrl_20ms = 0;
+						   enable_respiracao = 255;
+						   vl6180x_max_min_respiracao(&respiracao_data[0]);
+						   if((maxv - minv) > THRESHOLD_V) {
+							   haste = 255;
+							   lasteventr = xTaskGetTickCount() * portTICK_PERIOD_MS;
+						   }
+					   }
+				   }
+			   }
+			   else {
+				   print_status_range("Respiracao-", status_respiracao);
+			   }
+		   }
+		   // Transmite para  APP.
+#if PLACA_FINAL
+		   if(haste == 0 && enable_compressao) {
+			   tmr_c = xTaskGetTickCount() * portTICK_PERIOD_MS;
+			   printf("C,%d,%d,%d,%d,%d,%d,%d,%d,F\n",compressao_data[0], compressao_data[1],
+					                                  compressao_data[2], compressao_data[3],
+                                                      compressao_data[4], PosicaoMao, maxc, minc);
+			   sprintf(msg, "C,%d,%d,%d,%d,%d,%d,F",compressao_data[0], compressao_data[1],
+						                            compressao_data[2], compressao_data[3],
+                                                    compressao_data[4], PosicaoMao);
+			   send(SocketClient, msg, strlen(msg), 0);
+			   enable_compressao = 0;
+		   }
+#endif
+		   if( haste != 0 && enable_respiracao ) {
+			   tmr_r = xTaskGetTickCount() * portTICK_PERIOD_MS;
+			   printf("%d-V,%d,%d,%d,%d,%d;%d,%d,F\n",tmr_r, respiracao_data[0], respiracao_data[1],
+		                                    	             respiracao_data[2], respiracao_data[3],
+							                                 respiracao_data[4], maxv, minv);
+			   sprintf(msg, "V,%d,%d,%d,%d,%d,F",respiracao_data[0], respiracao_data[1],
+							                     respiracao_data[2], respiracao_data[3],
+							                     respiracao_data[4]);
+			   send(SocketClient, msg, strlen(msg), 0);
+			   enable_respiracao = 0;
+		   }
+	   }	// End Flag_Sensor
+	    vTaskDelay(10 / portTICK_PERIOD_MS);
+	}	// End While
     vTaskDelete(NULL);
 }

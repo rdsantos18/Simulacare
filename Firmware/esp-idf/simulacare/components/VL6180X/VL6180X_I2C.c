@@ -226,7 +226,8 @@ void VL6180X_configureDefault(struct VL6180X_data* dev)
 	VL6180X_writeReg(dev->i2c_address, SYSTEM_MODE_GPIO1, 0x10);
 
 	// readout__averaging_sample_period = 48
-	VL6180X_writeReg(dev->i2c_address, READOUT_AVERAGING_SAMPLE_PERIOD, 0x30);
+	//VL6180X_writeReg(dev->i2c_address, READOUT_AVERAGING_SAMPLE_PERIOD, 0x30);
+	VL6180X_writeReg(dev->i2c_address, READOUT_AVERAGING_SAMPLE_PERIOD, 24);
 
 	// sysals__analogue_gain_light = 6 (ALS gain = 1 nominal, actually 1.01 according to Table 14 in datasheet)
 	VL6180X_writeReg(dev->i2c_address, SYSALS_ANALOGUE_GAIN, 0x46);
@@ -255,7 +256,8 @@ void VL6180X_configureDefault(struct VL6180X_data* dev)
 	// Reset other settings to power-on defaults
 
 	// sysrange__max_convergence_time = 49 (49 ms)
-	VL6180X_writeReg(dev->i2c_address, SYSRANGE_MAX_CONVERGENCE_TIME, 0x31);
+	//VL6180X_writeReg(dev->i2c_address, SYSRANGE_MAX_CONVERGENCE_TIME, 0x31);
+	VL6180X_writeReg(dev->i2c_address, SYSRANGE_MAX_CONVERGENCE_TIME, 5);
 
 	// disable interleaved mode
 	VL6180X_writeReg(dev->i2c_address, INTERLEAVED_MODE_ENABLE, 0);
@@ -326,7 +328,7 @@ uint8_t VL6180X_readRangeContinuous(struct VL6180X_data* dev)
   }
 
   uint8_t range = VL6180X_readReg(dev->i2c_address, RESULT_RANGE_VAL);
-  VL6180X_writeReg(dev->i2c_address, SYSTEM_INTERRUPT_CLEAR, 0x01);
+  VL6180X_writeReg(dev->i2c_address, SYSTEM_INTERRUPT_CLEAR, 0x07);
 
   return range;
 }
@@ -347,7 +349,7 @@ uint16_t VL6180X_readAmbientContinuous(struct VL6180X_data* dev)
   }
 
   uint16_t ambient = VL6180X_readReg16Bit(dev->i2c_address, RESULT_ALS_VAL);
-  VL6180X_writeReg(dev->i2c_address, SYSTEM_INTERRUPT_CLEAR, 0x02);
+  VL6180X_writeReg(dev->i2c_address, SYSTEM_INTERRUPT_CLEAR, 0x07);
 
   return ambient;
 }

@@ -103,7 +103,7 @@ void sound(int gpio_num,uint32_t freq,uint32_t duration) {
     ledc_update_duty(GPIO_OUTPUT_SPEED, LEDC_CHANNEL_0);
 }
 
-void play_on()
+void play_on(void)
 {
 	sound(GPIO_OUTPUT, 4000, 200);
 	vTaskDelay(300 / portTICK_PERIOD_MS);
@@ -112,7 +112,7 @@ void play_on()
 	BuzzerState = 0;
 }
 
-void play_off()
+void play_off(void)
 {
 	sound(GPIO_OUTPUT, 4000, 100);
 	vTaskDelay(100 / portTICK_PERIOD_MS);
@@ -129,7 +129,7 @@ void play_off()
 	BuzzerState = 0;
 }
 
-void play_bat_1()
+void play_bat_1(void)
 {
 	sound(GPIO_OUTPUT, 4000, 150);
 	vTaskDelay(150 / portTICK_PERIOD_MS);
@@ -146,7 +146,7 @@ void play_bat_1()
 	BuzzerState = 0;
 }
 
-void play_bat_2()
+void play_bat_2(void)
 {
 	sound(GPIO_OUTPUT, 2000, 150);
 	vTaskDelay(150 / portTICK_PERIOD_MS);
@@ -163,7 +163,7 @@ void play_bat_2()
 	BuzzerState = 0;
 }
 
-void play_alarm1()		// Power ON
+void play_alarm1(void)		// Power ON
 {
 	sound(GPIO_OUTPUT, 2000, 100);
 	vTaskDelay(100 / portTICK_PERIOD_MS);
@@ -177,7 +177,7 @@ void play_alarm1()		// Power ON
 	//vTaskDelay(100 / portTICK_PERIOD_MS);
 }
 
-void play_alarm2()		// Power Off
+void play_alarm2(void)		// Power Off
 {
 	sound(GPIO_OUTPUT,2000,200);
 	vTaskDelay(200/portTICK_PERIOD_MS);
@@ -189,16 +189,16 @@ void play_alarm2()		// Power Off
 	vTaskDelay(200/portTICK_PERIOD_MS);
 }
 
-void play_alarm3()		// Bateria Baixa
+void play_alarm3(void)		// Bateria Baixa
 {
 }
 
-void play_alarm4()		// Desligar Bateria
+void play_alarm4(void)		// Desligar Bateria
 {
 }
 
 // based on https://wiki.mikrotik.com/wiki/Super_Mario_Theme
-void play_theme() {
+void play_theme(void) {
 	sound(GPIO_OUTPUT,660,100);
 	vTaskDelay(150/portTICK_PERIOD_MS);
 	sound(GPIO_OUTPUT,660,100);

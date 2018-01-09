@@ -90,6 +90,7 @@ struct VL6180X_data {
 	bool did_timeout;
 };
 
+
 void VL6180X_writeReg(uint8_t address, uint16_t reg, uint8_t value);
 void VL6180X_writeReg16Bit(uint8_t address, uint16_t reg, uint16_t value);
 void VL6180X_writeReg32Bit(uint8_t address, uint16_t reg, uint32_t value);
