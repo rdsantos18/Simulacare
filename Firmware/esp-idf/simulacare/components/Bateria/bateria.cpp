@@ -16,6 +16,7 @@
 #include <esp_log.h>
 #include "driver/gpio.h"
 #include "lwip/sockets.h"
+#include "esp_spp_api.h"
 #include "kalman.h"
 #include "kalman2.h"
 
@@ -43,10 +44,9 @@ SimpleKalmanFilter FilterBateria(5, 5, 0.1);
 uint8_t Carregador;
 float BateriaVoltage;
 uint32_t CarregadorVoltage;
-uint32_t BateriaLevel;
+uint8_t BateriaLevel;
 
 int SensorCharge;
-char msg[20];
 int ret;
 uint8_t flag_bat1;
 uint8_t flag_bat2;
@@ -54,6 +54,11 @@ uint8_t flag_bat2;
 extern uint8_t BuzzerState;
 extern int SocketClient;
 extern uint8_t flag_sensor;
+extern uint32_t bl_spp_handle;
+extern uint8_t modo_comunicacao;
+extern uint8_t bt_connected;
+extern char msg[];
+extern uint8_t msg_bl[];
 
 esp_adc_cal_characteristics_t vbat;
 esp_adc_cal_characteristics_t charge;
@@ -151,7 +156,15 @@ void bateria_task(void *pvParameters)
 		if(flag_sensor != 0) {
 			printf("B,%d,%.0f,%d,F\n", Carregador, BateriaVoltage, BateriaLevel);
 			sprintf(msg, "B,%d,%d,F",Carregador, BateriaLevel);
-			send(SocketClient, msg, strlen(msg), 0);
+			if(modo_comunicacao) {
+				send(SocketClient, msg, strlen(msg), 0);
+			}
+			else {
+				if(bt_connected == 255) {
+					memcpy(msg_bl, msg, strlen(msg));
+					esp_spp_write(bl_spp_handle, strlen(msg), msg_bl);
+				}
+			}
 		}
 		vTaskDelay(5000 / portTICK_PERIOD_MS);
 	}
