@@ -1,4 +1,5 @@
 # SimulaCare
-SimulaCare RCP Versao WI-FI
+SimulaCare RCP
+Versao WIFI + BLUETOOTH
 
 

@@ -9,6 +9,7 @@
 #include "sdkconfig.h"
 #include "lwip/sockets.h"
 #include "nvs_flash.h"
+#include "esp_spp_api.h"
 
 #define TAG "VL6180X"
 
@@ -74,8 +75,12 @@ extern uint16_t limite2;
 extern uint16_t limite3;
 extern uint16_t limite4;
 extern uint8_t flag_teste;
+extern uint32_t bl_spp_handle;
+extern uint8_t modo_comunicacao;
+extern uint8_t bt_connected;
 
-char msg[255];
+char msg[50];
+uint8_t msg_bl[50];
 int ret;
 
 static char tag[] = "vl6180x";
@@ -316,12 +321,10 @@ void vl6180x_task(void *ignore)
 			   if (status_compressao == VL6180X_ERROR_NONE) {
 				   rasc_c[c_ctrl_20ms] = value;
 				   c_ctrl_20ms++;
-				   if(c_ctrl_20ms == 10) {
+				   if(c_ctrl_20ms == 5) {
 					   c_ctrl_20ms = 0;
-				       compressao_data[c_ctrl_100ms] = ((rasc_c[0] + rasc_c[1] + rasc_c[2] +
-				    		                             rasc_c[3] + rasc_c[4] + rasc_c[5] +
-														 rasc_c[6] + rasc_c[7] + rasc_c[8] +
-														 rasc_c[9]) / 10);
+				           compressao_data[c_ctrl_100ms] = ((rasc_c[0] + rasc_c[1] + rasc_c[2] +
+				    		                                 rasc_c[3] + rasc_c[4]) / 10);
 					   c_ctrl_100ms++;
 					   if(c_ctrl_100ms == 5) {
 						   c_ctrl_100ms = 0;
@@ -347,12 +350,10 @@ void vl6180x_task(void *ignore)
 			   if(status_respiracao == VL6180X_ERROR_NONE) {
 				   rasc_r[r_ctrl_20ms] = respi;
 				   r_ctrl_20ms++;
-				   if(r_ctrl_20ms == 10) {
+				   if(r_ctrl_20ms == 5) {
 					   r_ctrl_20ms = 0;
 					   respiracao_data[r_ctrl_100ms] = ((rasc_r[0] + rasc_r[1] + rasc_r[2] +
-							                             rasc_r[3] + rasc_r[4] + rasc_r[5] +
-														 rasc_r[6] + rasc_r[7] + rasc_r[8] +
-														 rasc_r[9]) / 10);
+							                             rasc_r[3] + rasc_r[4]) / 10);
 					   r_ctrl_100ms++;
 					   if(r_ctrl_100ms == 5) {
 						   r_ctrl_100ms = 0;
@@ -380,7 +381,15 @@ void vl6180x_task(void *ignore)
 			   sprintf(msg, "C,%d,%d,%d,%d,%d,%d,F",compressao_data[0], compressao_data[1],
 						                            compressao_data[2], compressao_data[3],
                                                     compressao_data[4], PosicaoMao);
-			   send(SocketClient, msg, strlen(msg), 0);
+			   if(modo_comunicacao) {
+				   send(SocketClient, msg, strlen(msg), 0);
+			   }
+			   else {
+				   if(bt_connected == 255) {
+					   memcpy(msg_bl, msg, strlen(msg));
+					   esp_spp_write(bl_spp_handle, strlen(msg), msg_bl);
+				   }
+			   }
 			   enable_compressao = 0;
 		   }
 #endif
@@ -392,11 +401,19 @@ void vl6180x_task(void *ignore)
 			   sprintf(msg, "V,%d,%d,%d,%d,%d,F",respiracao_data[0], respiracao_data[1],
 							                     respiracao_data[2], respiracao_data[3],
 							                     respiracao_data[4]);
-			   send(SocketClient, msg, strlen(msg), 0);
+			   if(modo_comunicacao) {
+				   send(SocketClient, msg, strlen(msg), 0);
+			   }
+			   else {
+				   if(bt_connected == 255) {
+					   memcpy(msg_bl, msg, strlen(msg));
+					   esp_spp_write(bl_spp_handle, strlen(msg), msg_bl);
+				   }
+			   }
 			   enable_respiracao = 0;
 		   }
 	   }	// End Flag_Sensor
-	    vTaskDelay(10 / portTICK_PERIOD_MS);
+	    vTaskDelay(20 / portTICK_PERIOD_MS);
 	}	// End While
     vTaskDelete(NULL);
 }
