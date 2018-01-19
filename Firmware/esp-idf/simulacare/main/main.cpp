@@ -80,10 +80,12 @@ uint8_t mode_wifi;
 char ssid[32];
 char password[64];
 char btname[32];
+uint8_t mac_wifi[6];
+uint8_t mac_bt[6];
 uint8_t modo_comunicacao = 0; // Bluetooth = 0; WiFi = 1
 uint8_t bt_connected = 0;
 
-char versao[] = "SimulaCare RCP v.1.1.5 17/01/2018";
+char versao[] = "SimulaCare RCP v.1.1.5 18/01/2018";
 
 static const esp_spp_mode_t esp_spp_mode = ESP_SPP_MODE_CB;
 static const esp_spp_sec_t sec_mask = ESP_SPP_SEC_NONE;
@@ -97,7 +99,9 @@ static void esp_spp_cb(esp_spp_cb_event_t event, esp_spp_cb_param_t *param)
     switch (event) {
     case ESP_SPP_INIT_EVT:
         ESP_LOGI(SPP_TAG, "ESP_SPP_INIT_EVT");
-        esp_bt_dev_set_device_name(SPP_DEVICE_NAME);
+        esp_read_mac(mac_bt, ESP_MAC_BT);
+	    printf("MAC_BT:%02X:%02X:%02X:%02X:%02X:%02X\n", mac_bt[0],mac_bt[1],mac_bt[2],mac_bt[3],mac_bt[4],mac_bt[5]);
+        esp_bt_dev_set_device_name(btname);
         esp_bt_gap_set_scan_mode(ESP_BT_SCAN_MODE_CONNECTABLE_DISCOVERABLE);
         esp_spp_start_srv(sec_mask,role_slave, 0, SPP_SERVER_NAME);
         break;
@@ -252,40 +256,43 @@ esp_err_t get_config(void)
     size_t required_size = 0;
     err = nvs_get_blob(handle, "ssid", NULL, &required_size);
     if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND) return err;
-    printf("SSID:\n");
     if(required_size == 0) {
     	printf("Nothing Saved Yet!\n");
+    	return ESP_ERR_INVALID_ARG;
     }
     else {
     	required_size = 32;
     	err = nvs_get_blob(handle, "ssid" , ssid, &required_size);
     	if(err != ESP_OK) return err;
+    	//else printf("SSID: %s\n", ssid);
     }
 
     required_size = 0;
     err = nvs_get_blob(handle, "password", NULL, &required_size);
     if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND) return err;
-    printf("PASSWORD:\n");
     if(required_size == 0) {
     	printf("Nothing Saved Yet!\n");
+    	return ESP_ERR_INVALID_ARG;
     }
     else {
     	required_size = 64;
     	err = nvs_get_blob(handle, "password" , password, &required_size);
         if(err != ESP_OK) return err;
+        //else printf("Password: %s\n", password);
     }
 
     required_size = 0;
     err = nvs_get_blob(handle, "btname", NULL, &required_size);
     if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND) return err;
-    printf("BTNAME:\n");
     if(required_size == 0) {
     	printf("Nothing Saved Yet!\n");
+    	return ESP_ERR_INVALID_ARG;
     }
     else {
     	required_size = 32;
     	err = nvs_get_blob(handle, "btname" , btname, &required_size);
         if(err != ESP_OK) return err;
+        //else printf("BTNAME: %s\n", btname);
     }
 
     err = nvs_get_u16(handle, "limite1", &limite1);
@@ -365,6 +372,8 @@ static void initialise_wifi(void)
     		wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
     		ESP_ERROR_CHECK( esp_wifi_init(&cfg) );
     		ESP_ERROR_CHECK( esp_wifi_set_storage(WIFI_STORAGE_RAM) );
+		    esp_wifi_get_mac(WIFI_IF_STA, mac_wifi);
+		    printf("MAC_WIF:%02X:%02X:%02X:%02X:%02X:%02X\n", mac_wifi[0],mac_wifi[1],mac_wifi[2],mac_wifi[3],mac_wifi[4],mac_wifi[5]);
     		wifi_config_t wifi_config = { };
     		strcpy((char *)wifi_config.sta.ssid, "MONYTEL_C");
     		strcpy((char *)wifi_config.sta.password, "Monytel_Comercial");
@@ -377,19 +386,21 @@ static void initialise_wifi(void)
     		ESP_LOGI(TAG, "Connected");
     	}
     	else {
-        	tcpip_adapter_init();
+    		tcpip_adapter_init();
         	wifi_event_group = xEventGroupCreate();
         	ESP_ERROR_CHECK( esp_event_loop_init(wifi_event_handler, NULL) );
         	wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
         	ESP_ERROR_CHECK( esp_wifi_init(&cfg) );
         	ESP_ERROR_CHECK( esp_wifi_set_storage(WIFI_STORAGE_RAM) );
         	ESP_ERROR_CHECK( esp_wifi_set_mode(WIFI_MODE_AP) );
+		    esp_wifi_get_mac(WIFI_IF_AP, mac_wifi);
+        	printf("MAC_WIFI:%02X:%02X:%02X:%02X:%02X:%02X\n", mac_wifi[0],mac_wifi[1],mac_wifi[2],mac_wifi[3],mac_wifi[4],mac_wifi[5]);
         	wifi_config_t apConfig = { };
-            strcpy((char *)apConfig.ap.ssid, "SimulaCare-RCP");
+            strcpy((char *)apConfig.ap.ssid, ssid);
             apConfig.ap.ssid_len = 0;
             apConfig.ap.channel = 0;
             apConfig.ap.authmode = WIFI_AUTH_WPA2_PSK;
-            strcpy((char *)apConfig.ap.password, "12345678");
+            strcpy((char *)apConfig.ap.password, password);
             apConfig.ap.ssid_hidden = 0;
             apConfig.ap.max_connection = 4;
             apConfig.ap.beacon_interval = 100;
@@ -467,11 +478,42 @@ void app_main(void)
     printf("ESP32 MAC:%02X:%02X:%02X:%02X:%02X:%02X\n", mac[0],mac[1],mac[2],mac[3],mac[4],mac[5]);
     printf("ESP32 Free Heap Size: %08i\n", esp_get_minimum_free_heap_size());
 
-    get_config();
+	//modo_comunicacao = 0;
+	//mode_wifi = 1;
+	//strcpy((char *)ssid, "SimulaCare-RCP");
+	//printf("SSID: %s\n", ssid);
+	//strcpy((char *)btname, "SimulaCare-RCP");
+	//printf("BTNAME: %s\n", btname);
+	//strcpy((char *)password, "12345678");
+	//printf("Password: %s\n", password);
+	//limite1 = limite1;
+	//limite2 = limite2;
+	//limite3 = limite3;
+	//limite4 = limite4;
+
+    err = get_config();
+    if (err != ESP_OK) {
+    	printf("Grava Programaçao Default!\n");
+    	modo_comunicacao = 0;
+		mode_wifi = 1;
+		strcpy((char *)ssid, "SimulaCare-RCP");
+		strcpy((char *)btname, "SimulaCare-RCP");
+		strcpy((char *)password, "12345678");
+		limite1 = limite1;
+		limite2 = limite2;
+		limite3 = limite3;
+		limite4 = limite4;
+    	save_config();
+    }
+//    else {
+//    	printf("Programacao nao Salva!!!\n");
+//    }
+
     printf("Modo_Comunicacao: %d\n", modo_comunicacao);
     printf("Mode_WIFI: %d\n", mode_wifi);
     printf("SSID: %s\n", ssid);
     printf("PASSWD: %s\n", password);
+    printf("BTNAME: %s\n", btname);
     printf("Limit1: %d\n", limite1);
     printf("Limit2: %d\n", limite2);
     printf("Limit3: %d\n", limite3);
