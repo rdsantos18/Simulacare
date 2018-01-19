@@ -85,7 +85,7 @@ uint8_t mac_bt[6];
 uint8_t modo_comunicacao = 0; // Bluetooth = 0; WiFi = 1
 uint8_t bt_connected = 0;
 
-char versao[] = "SimulaCare RCP v.1.1.5 18/01/2018";
+char versao[] = "SimulaCare RCP v.1.1.5 19/01/2018";
 
 static const esp_spp_mode_t esp_spp_mode = ESP_SPP_MODE_CB;
 static const esp_spp_sec_t sec_mask = ESP_SPP_SEC_NONE;
