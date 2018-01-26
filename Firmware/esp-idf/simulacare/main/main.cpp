@@ -23,6 +23,7 @@
 #include "esp_event_loop.h"
 #include "nvs_flash.h"
 #include "driver/gpio.h"
+#include "mdns.h"
 #include "esp_spi_flash.h"
 #include "lwip/inet.h"
 #include "lwip/ip4_addr.h"
@@ -359,6 +360,30 @@ static esp_err_t wifi_event_handler(void *ctx, system_event_t *event)
     return ESP_OK;
 }
 
+static void initialise_mdns(void)
+{
+    //initialize mDNS
+    ESP_ERROR_CHECK( mdns_init() );
+    //set mDNS hostname (required if you want to advertise services)
+    ESP_ERROR_CHECK( mdns_hostname_set("SimulaCare-RCP"));
+    //set default mDNS instance name
+    ESP_ERROR_CHECK( mdns_instance_name_set("SimulaCare"));
+
+    //structure with TXT records
+    mdns_txt_item_t serviceTxtData[3] = {
+        {"board","esp32"},
+        {"u","user"},
+        {"p","password"}
+    };
+
+    //initialize service
+    ESP_ERROR_CHECK( mdns_service_add("SimulaCare-RCP", "_http", "_tcp", 80, serviceTxtData, 3) );
+    //add another TXT item
+    //ESP_ERROR_CHECK( mdns_service_txt_item_set("_http", "_tcp", "path", "/foobar") );
+    //change TXT item value
+    //ESP_ERROR_CHECK( mdns_service_txt_item_set("_http", "_tcp", "u", "admin") );
+}
+
 static void initialise_wifi(void)
 {
 	mode_wifi = MODE_AP;
@@ -375,8 +400,8 @@ static void initialise_wifi(void)
 		    esp_wifi_get_mac(WIFI_IF_STA, mac_wifi);
 		    printf("MAC_WIF:%02X:%02X:%02X:%02X:%02X:%02X\n", mac_wifi[0],mac_wifi[1],mac_wifi[2],mac_wifi[3],mac_wifi[4],mac_wifi[5]);
     		wifi_config_t wifi_config = { };
-    		strcpy((char *)wifi_config.sta.ssid, "MONYTEL_C");
-    		strcpy((char *)wifi_config.sta.password, "Monytel_Comercial");
+    		strcpy((char *)wifi_config.sta.ssid, "2G Telescience");
+    		strcpy((char *)wifi_config.sta.password, "Tele012018");
       		ESP_ERROR_CHECK( esp_wifi_set_mode(WIFI_MODE_STA) );
     		ESP_ERROR_CHECK( esp_wifi_set_config(WIFI_IF_STA, &wifi_config) );
     		ESP_ERROR_CHECK( esp_wifi_start() );
@@ -519,6 +544,7 @@ void app_main(void)
     printf("Limit3: %d\n", limite3);
     printf("Limit4: %d\n", limite4);
 
+    initialise_mdns();
     initialise_wifi();
     bt_spp_init();
     
